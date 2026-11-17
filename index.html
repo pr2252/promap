@@ -417,7 +417,7 @@
     let currentFilteredVenues = [];
     let currentVenueIndex = -1;
     let markersMap = {}; 
-    let activeLeague = null;
+    let activeFilterKey = null; // Can be league name or "metro:MetroName"
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -547,19 +547,19 @@
       }
     }
 
-    function renderSidebarTree(groupedData) {
+    function renderSidebarTree(leagueGrouped, metroGrouped) {
       const container = document.getElementById('sidebar-tree');
       container.innerHTML = '';
 
-      function renderGroupList(title, leagueNames) {
+      function renderLeagueGroup(title, leagueNames) {
         const heading = document.createElement('div');
         heading.className = 'section-heading';
         heading.textContent = title;
         container.appendChild(heading);
 
         leagueNames.forEach(league => {
-          if (!groupedData[league]) return;
-          const teams = groupedData[league].sort((a, b) => a.team.localeCompare(b.team));
+          if (!leagueGrouped[league]) return;
+          const teams = leagueGrouped[league].sort((a, b) => a.team.localeCompare(b.team));
           const color = LEAGUE_COLORS[league] || "#475569";
 
           const groupDiv = document.createElement('div');
@@ -588,9 +588,9 @@
             if (isHidden) {
               listDiv.style.display = 'flex';
               summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-              activeLeague = league;
+              activeFilterKey = league;
             } else {
-              activeLeague = null;
+              activeFilterKey = null;
             }
 
             ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
@@ -628,11 +628,105 @@
         });
       }
 
-      const availableBig4 = BIG_4_ORDER.filter(l => groupedData[l]);
-      const availableOthers = OTHER_LEAGUES_ORDER.filter(l => groupedData[l]);
+      const availableBig4 = BIG_4_ORDER.filter(l => leagueGrouped[l]);
+      const availableOthers = OTHER_LEAGUES_ORDER.filter(l => leagueGrouped[l]);
 
-      renderGroupList("Big 4 Leagues", availableBig4);
-      renderGroupList("Other Leagues", availableOthers);
+      renderLeagueGroup("Big 4 Leagues", availableBig4);
+      renderLeagueGroup("Other Leagues", availableOthers);
+
+      // Metro Areas Section
+      const metroHeading = document.createElement('div');
+      metroHeading.className = 'section-heading';
+      metroHeading.textContent = "Metro Areas";
+      container.appendChild(metroHeading);
+
+      // Sort metros by total number of teams descending, then alphabetically by name
+      const sortedMetros = Object.keys(metroGrouped).sort((a, b) => {
+        const countDiff = metroGrouped[b].length - metroGrouped[a].length;
+        if (countDiff !== 0) return countDiff;
+        return a.localeCompare(b);
+      });
+
+      sortedMetros.forEach(metro => {
+        const teams = metroGrouped[metro].sort((a, b) => a.team.localeCompare(b.team));
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'conf-group';
+
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'conf-summary';
+        summaryDiv.innerHTML = `
+          <div class="conf-info-left">
+            <span class="conf-swatch" style="background:#64748b;"></span>
+            <span><b>${metro}</b> (${teams.length})</span>
+          </div>
+          <span class="conf-toggle-arrow">▼</span>
+        `;
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'school-list';
+        listDiv.style.display = 'none';
+
+        summaryDiv.addEventListener('click', () => {
+          const isHidden = listDiv.style.display === 'none';
+
+          document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+
+          if (isHidden) {
+            listDiv.style.display = 'flex';
+            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
+            activeFilterKey = "metro:" + metro;
+
+            // Compute bounding box or center for metro teams to zoom in
+            let lats = teams.map(t => t.coords[0]);
+            let lngs = teams.map(t => t.coords[1]);
+            let minLat = Math.min(...lats), maxLat = Math.max(...lats);
+            let minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+            let centerLat = (minLat + maxLat) / 2;
+            let centerLng = (minLng + maxLng) / 2;
+
+            if (teams.length === 1) {
+              map.flyTo([centerLat, centerLng], 13, { duration: 0.8 });
+            } else {
+              map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], maxZoom: 12, duration: 0.8 });
+            }
+          } else {
+            activeFilterKey = null;
+            map.setView([39.8283, -98.5795], getNationalZoom());
+          }
+
+          ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.background = '#334155';
+          });
+
+          updateMapFilters();
+          resetRightPanel();
+        });
+
+        teams.forEach(v => {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'school-item';
+          itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
+          itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
+
+          itemDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+            map.flyTo(v.coords, 15, { duration: 0.8 });
+            if (markersMap[v.team]) {
+              markersMap[v.team].openPopup();
+            }
+            showVenueDetails(v, globalIdx);
+          });
+
+          listDiv.appendChild(itemDiv);
+        });
+
+        groupDiv.appendChild(summaryDiv);
+        groupDiv.appendChild(listDiv);
+        container.appendChild(groupDiv);
+      });
 
       updateMapFilters();
     }
@@ -644,8 +738,13 @@
 
       venues.forEach(v => {
         let show = false;
-        if (activeLeague) {
-          show = (v.league === activeLeague);
+        if (activeFilterKey) {
+          if (activeFilterKey.startsWith("metro:")) {
+            const targetMetro = activeFilterKey.substring(6);
+            show = (v.metro === targetMetro);
+          } else {
+            show = (v.league === activeFilterKey);
+          }
         } else {
           const btnAll = document.getElementById('btn-select-all');
           const btnBig4 = document.getElementById('btn-big-4');
@@ -691,7 +790,7 @@
       activeBtn.style.background = '#0284c7';
       activeBtn.style.borderColor = '#0369a1';
 
-      activeLeague = null;
+      activeFilterKey = null;
       document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
       map.setView([39.8283, -98.5795], getNationalZoom());
@@ -721,10 +820,12 @@
       }
 
       venues = [];
-      const grouped = {};
+      const leagueGrouped = {};
+      const metroGrouped = {};
 
       rawRows.forEach(row => {
         const league = String(getRowVal(row, ['League']) || '').trim();
+        const metro = String(getRowVal(row, ['Metro Area', 'Metro']) || 'Other').trim();
         const team = String(getRowVal(row, ['Team', 'Team Name', 'Franchise', 'Club']) || '').trim();
         const venueName = String(getRowVal(row, ['Venue Name', 'Stadium', 'Venue']) || '').trim();
         const venueCity = String(getRowVal(row, ['City', 'Venue City']) || '').trim();
@@ -735,14 +836,17 @@
         const wikiUrl = String(getRowVal(row, ['Venue Wiki', 'Wiki', 'Wikipedia']) || '').trim();
 
         if (!league || !venueName || isNaN(lat) || isNaN(lng) || !team) return;
-        const vObj = { league, team, venue: venueName, venueCity, capacity, notes, coords: [lat, lng], wikiUrl };
+        const vObj = { league, metro, team, venue: venueName, venueCity, capacity, notes, coords: [lat, lng], wikiUrl };
         venues.push(vObj);
 
-        if (!grouped[league]) grouped[league] = [];
-        grouped[league].push(vObj);
+        if (!leagueGrouped[league]) leagueGrouped[league] = [];
+        leagueGrouped[league].push(vObj);
+
+        if (!metroGrouped[metro]) metroGrouped[metro] = [];
+        metroGrouped[metro].push(vObj);
       });
 
-      renderSidebarTree(grouped);
+      renderSidebarTree(leagueGrouped, metroGrouped);
     };
 
     /* Top Filter Buttons */
