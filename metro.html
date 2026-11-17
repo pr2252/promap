@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pro Sports by Metro Area</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body { 
+      margin: 0; 
+      padding: 0; 
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    }
+
+    #map { 
+      height: 100vh; 
+      height: 100dvh; 
+      width: 100vw; 
+    }
+
+    /* Top Title Header */
+    #top-header {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.90);
+      color: #ffffff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 700;
+      z-index: 10000;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px);
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* Sync Indicator Status Banner */
+    #status-banner {
+      position: absolute;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.88);
+      color: #f8fafc;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+    }
+
+    /* Attribution Offset */
+    .leaflet-bottom.leaflet-left {
+      bottom: 28px !important;
+      left: 10px !important;
+    }
+
+    .dashboard-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 90vw;
+      box-sizing: border-box;
+    }
+
+    .dashboard-card {
+      background: rgba(255, 255, 255, 0.96);
+      padding: 10px 12px;
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+      backdrop-filter: blur(4px);
+      box-sizing: border-box;
+    }
+
+    /* Filter Card */
+    .filter-card {
+      min-width: 175px;
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+
+    .card-title {
+      font-weight: 800;
+      font-size: 11px;
+      margin-bottom: 6px;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1.5px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+
+    .filter-actions { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+    
+    .btn-action {
+      background: #f1f5f9;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #334155;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+    .btn-action:hover { background: #e2e8f0; color: #0f172a; }
+    .btn-action.active {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #0369a1;
+      font-weight: 700;
+      box-shadow: 0 0 0 1.5px rgba(2, 132, 199, 0.4);
+    }
+
+    .btn-reset {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .btn-reset:hover { background: #e2e8f0; color: #0f172a; }
+
+    /* HTML Details / Summary Dropdown */
+    .league-dropdown {
+      margin-top: 4px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 6px;
+    }
+    .league-dropdown summary {
+      font-size: 11px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .league-dropdown summary::-webkit-details-marker {
+      display: none;
+    }
+    .league-dropdown summary::after {
+      content: '▾';
+      font-size: 10px;
+      color: #64748b;
+    }
+    .league-dropdown[open] summary::after {
+      content: '▴';
+    }
+
+    .league-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 6px;
+      padding-left: 2px;
+    }
+    .league-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      margin: 2px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    .league-option input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: #0284c7;
+      width: 15px;
+      height: 15px;
+    }
+
+    /* National Zoom Compact Metro Circle Badge */
+    .metro-box-icon { background: transparent; border: none; }
+    .metro-circle-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      font-weight: 800;
+      font-size: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .metro-circle-badge:hover {
+      transform: translate(-50%, -50%) scale(1.25);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      z-index: 9999 !important;
+    }
+
+    /* Metro Hover Tooltip */
+    .metro-tooltip {
+      background: rgba(15, 23, 42, 0.92) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      border-radius: 6px !important;
+      color: #ffffff !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      padding: 4px 8px !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+      white-space: nowrap !important;
+    }
+
+    /* Monochromatic Blue Gradient Tiers */
+    .metro-tier-1 { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0c4a6e; border: 1.5px solid #ffffff; }
+    .metro-tier-2 { background: linear-gradient(135deg, #7dd3fc, #38bdf8); color: #082f49; border: 1.5px solid #ffffff; }
+    .metro-tier-3 { background: linear-gradient(135deg, #0284c7, #0369a1); color: #ffffff; border: 1.5px solid #ffffff; }
+    .metro-tier-4 { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); color: #ffffff; border: 1.5px solid #ffffff; }
+    .metro-tier-5 { background: linear-gradient(135deg, #0f2b5c, #051329); color: #ffffff; border: 1.5px solid #93c5fd; box-shadow: 0 2px 8px rgba(5, 19, 41, 0.6); }
+
+    /* Standard Reliable Venue Tooltip */
+    .venue-tooltip {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      color: #0f172a;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      cursor: pointer;
+      pointer-events: auto !important;
+      white-space: nowrap;
+    }
+
+    /* Pop-up Styling */
+    .popup-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; color: #1a202c; }
+    .popup-subtitle { font-size: 11px; color: #718096; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+    .team-item { font-size: 12px; margin: 3px 0; line-height: 1.4; color: #2d3748; }
+    .venue-name-sub { font-size: 11px; color: #64748b; font-weight: 400; margin-left: 2px; }
+    .league-badge { font-weight: 700; font-size: 10px; color: #fff; background: #475569; padding: 1px 4px; border-radius: 3px; margin-right: 5px; display: inline-block; }
+    .wiki-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #0284c7; text-decoration: none; font-weight: 600; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; width: 100%; }
+    .wiki-link:hover { color: #0369a1; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div id="top-header">Pro Sports by Metro Area</div>
+
+  <div id="status-banner">
+    <span class="status-dot"></span>
+    <span id="status-text">Connecting to Google Sheets...</span>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const SPREADSHEET_ID = "1XHaT57dHhRLtMojDEXhMn8AMScxz5F7WBe1i8y6NIe4";
+    const SHEET_GID = "512966518";
+
+    const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    });
+
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 18
+    });
+
+    const map = L.map('map', { 
+      zoomControl: true,
+      layers: [osmStandard]
+    }).setView([39.8283, -98.5795], 4);
+
+    let activeBasemapLayer = osmStandard;
+
+    map.createPane('venuePane');
+    map.getPane('venuePane').style.zIndex = 500;
+
+    map.createPane('metroBadgePane');
+    map.getPane('metroBadgePane').style.zIndex = 650;
+
+    const metroLayer = L.layerGroup().addTo(map);
+    const venueLayer = L.layerGroup().addTo(map);
+
+    let venues = [];
+    let metroCenters = {};
+    let activeMetro = null;
+    let activeVenueKey = null;
+    let lastZoomedMetro = null;
+    let refreshInProgress = false;
+    let initialFitDone = false;
+    let isZoomingToVenue = false;
+
+    function getTeamTierClass(count) {
+      if (count >= 11) return "metro-tier-5";
+      if (count >= 8)  return "metro-tier-4";
+      if (count >= 5)  return "metro-tier-3";
+      if (count >= 3)  return "metro-tier-2";
+      return "metro-tier-1";
+    }
+
+    function updateBasemapForZoom() {
+      const currentZoom = map.getZoom();
+      let targetLayer = currentZoom <= 6 ? osmStandard : esriSatellite;
+
+      if (activeBasemapLayer !== targetLayer) {
+        if (map.hasLayer(activeBasemapLayer)) {
+          map.removeLayer(activeBasemapLayer);
+        }
+        map.addLayer(targetLayer);
+        activeBasemapLayer = targetLayer;
+      }
+    }
+
+    function updateFilterButtonState() {
+      const allCheckboxes = Array.from(document.querySelectorAll('.league-checkbox'));
+      const checkedValues = new Set(allCheckboxes.filter(cb => cb.checked).map(cb => cb.value));
+      const bigFour = new Set(['NFL', 'MLB', 'NBA', 'NHL']);
+
+      const btnAll = document.getElementById('btn-select-all');
+      const btnBig4 = document.getElementById('btn-big-four');
+      const btnNone = document.getElementById('btn-select-none');
+
+      if (!btnAll || !btnBig4 || !btnNone) return;
+
+      btnAll.classList.remove('active');
+      btnBig4.classList.remove('active');
+      btnNone.classList.remove('active');
+
+      if (checkedValues.size === 0) {
+        btnNone.classList.add('active');
+      } else if (checkedValues.size === allCheckboxes.length) {
+        btnAll.classList.add('active');
+      } else if (checkedValues.size === 4 && [...bigFour].every(v => checkedValues.has(v))) {
+        btnBig4.classList.add('active');
+      }
+    }
+
+    function resetToDefaultView() {
+      activeVenueKey = null;
+      activeMetro = null;
+      lastZoomedMetro = null;
+      
+      const selectedLeagues = new Set(
+        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
+      );
+      const activeCoords = venues
+        .filter(v => v.teams.some(t => selectedLeagues.has(t.league)))
+        .map(v => v.coords);
+
+      if (activeCoords.length > 0) {
+        const bounds = L.latLngBounds(activeCoords);
+        map.fitBounds(bounds, { padding: [40, 40] });
+      } else {
+        map.setView([39.8283, -98.5795], 4);
+      }
+    }
+
+    function zoomToMetroArea(mName) {
+      const selectedLeagues = new Set(
+        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
+      );
+
+      const activeMetroVenues = venues.filter(v => 
+        v.metro === mName && v.teams.some(t => selectedLeagues.has(t.league))
+      );
+
+      if (activeMetroVenues.length === 0) return;
+
+      if (activeMetroVenues.length > 1) {
+        let bounds = L.latLngBounds(activeMetroVenues.map(v => v.coords));
+        map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 14, duration: 0.8 });
+      } else {
+        map.flyTo(activeMetroVenues[0].coords, 14, { duration: 0.8 });
+      }
+    }
+
+    function handleFilterChange() {
+      updateMap();
+      if (lastZoomedMetro) {
+        zoomToMetroArea(lastZoomedMetro);
+      }
+    }
+
+    function updateMap() {
+      if (venues.length === 0 || isZoomingToVenue) return;
+
+      updateBasemapForZoom();
+      updateFilterButtonState();
+
+      const selectedLeagues = new Set(
+        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
+      );
+
+      refreshInProgress = true;
+      metroLayer.clearLayers();
+      venueLayer.clearLayers();
+
+      const currentZoom = map.getZoom();
+      const isOverview = currentZoom <= 6;
+
+      const metroTeamsMap = {};
+      const metroVenuesMap = {};
+      Object.keys(metroCenters).forEach(m => {
+        metroTeamsMap[m] = [];
+        metroVenuesMap[m] = [];
+      });
+
+      const activeVenuesList = [];
+      venues.forEach(v => {
+        const activeTeamsAtVenue = v.teams.filter(t => selectedLeagues.has(t.league));
+        if (activeTeamsAtVenue.length > 0) {
+          if (!metroVenuesMap[v.metro]) metroVenuesMap[v.metro] = [];
+          if (!metroTeamsMap[v.metro]) metroTeamsMap[v.metro] = [];
+
+          metroVenuesMap[v.metro].push(v);
+          activeTeamsAtVenue.forEach(t => {
+            metroTeamsMap[v.metro].push({ league: t.league, name: t.name, venue: v.venue });
+          });
+          activeVenuesList.push({ venueObj: v, activeTeams: activeTeamsAtVenue });
+        }
+      });
+
+      if (!initialFitDone && activeVenuesList.length > 0) {
+        initialFitDone = true;
+        resetToDefaultView();
+      }
+
+      Object.keys(metroCenters).forEach(mName => {
+        const activeTeamList = metroTeamsMap[mName] || [];
+        const teamCount = activeTeamList.length;
+
+        if (teamCount > 0) {
+          const tierClass = getTeamTierClass(teamCount);
+          const teamListHtml = activeTeamList.map(t => 
+            `<div class="team-item"><span class="league-badge">${t.league}</span><b>${t.name}</b> <span class="venue-name-sub">(${t.venue})</span></div>`
+          ).join('');
+
+          const popupContent = `
+            <div class="popup-title">${mName}</div>
+            <div class="popup-subtitle">Total Teams Active: <b>${teamCount}</b></div>
+            ${teamListHtml}
+          `;
+
+          let marker;
+          const handleMetroClick = function(e) {
+            L.DomEvent.stopPropagation(e);
+            activeVenueKey = null;
+
+            if (activeMetro !== mName) {
+              activeMetro = mName;
+              lastZoomedMetro = mName;
+              zoomToMetroArea(mName);
+            } else if (marker) {
+              marker.openPopup();
+            }
+          };
+
+          if (isOverview) {
+            const metroIcon = L.divIcon({
+              className: 'metro-box-icon',
+              html: `<div class="metro-circle-badge ${tierClass}">${teamCount}</div>`,
+              iconSize: null
+            });
+            marker = L.marker(metroCenters[mName], { 
+              icon: metroIcon,
+              pane: 'metroBadgePane'
+            }).addTo(metroLayer);
+
+            marker.bindTooltip(`<b>${mName}</b><br><span style="font-size:10px; opacity:0.8;">${teamCount} Active Teams</span>`, {
+              className: 'metro-tooltip',
+              direction: 'top',
+              offset: [0, -12],
+              opacity: 0.95
+            });
+
+            marker.bindPopup(popupContent, { autoPan: true, autoPanPadding: [60, 20] });
+            marker.on('click', handleMetroClick);
+          }
+        }
+      });
+
+      // Plot Venues
+      activeVenuesList.forEach(item => {
+        const v = item.venueObj;
+        const activeTeams = item.activeTeams;
+
+        const marker = L.circleMarker(v.coords, {
+          pane: 'venuePane',
+          radius: 6,
+          fillColor: "#dc2626",
+          color: "#ffffff",
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.95
+        }).addTo(venueLayer);
+
+        const shortTeamSummary = activeTeams.map(t => t.name).join(', ');
+        const teamRows = activeTeams.map(t => `<div class="team-item"><span class="league-badge">${t.league}</span><b>${t.name}</b></div>`).join('');
+        const wikiUrl = v.wikiUrl && v.wikiUrl.startsWith('http') ? v.wikiUrl : `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(v.venue + ' ' + v.city)}`;
+
+        const popupMarkup = `
+          <div class="popup-title">${v.venue}</div>
+          <div class="popup-subtitle">${v.city} &bull; Metro: ${v.metro}</div>
+          ${teamRows}
+          <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-link">Wikipedia: ${v.venue} &rarr;</a>
+        `;
+
+        const venuePopup = L.popup({ autoPan: false, className: 'venue-popup-marker' }).setContent(popupMarkup);
+        marker.bindPopup(venuePopup);
+
+        const handleVenueClick = function(e) {
+          L.DomEvent.stopPropagation(e);
+          activeVenueKey = v.venue;
+          lastZoomedMetro = v.metro;
+          isZoomingToVenue = true;
+          
+          map.flyTo(v.coords, 15, { duration: 0.8 });
+          marker.openPopup();
+
+          setTimeout(() => {
+            isZoomingToVenue = false;
+          }, 900);
+        };
+
+        marker.on('click', handleVenueClick);
+
+        if (!isOverview) {
+          marker.bindTooltip(`<b>${v.venue}</b><br><span style="color:#64748b; font-size:10px;">${shortTeamSummary}</span>`, {
+            permanent: true,
+            direction: 'top',
+            className: 'venue-tooltip',
+            offset: [0, -8],
+            interactive: true
+          });
+        }
+      });
+
+      refreshInProgress = false;
+    }
+
+    // Dashboard Control: Quick Filter Header + Dropdown
+    const dashboardControl = L.control({ position: 'bottomleft' });
+    dashboardControl.onAdd = function() {
+      const container = L.DomUtil.create('div', 'dashboard-container');
+      const orderedLeagues = ["NFL", "MLB", "NBA", "NHL", "MLS", "NWSL", "WNBA"];
+      const defaultChecked = new Set(["NFL", "MLB", "NBA", "NHL"]);
+
+      const filterCard = L.DomUtil.create('div', 'dashboard-card filter-card', container);
+
+      let checkboxesHtml = orderedLeagues.map(lg => `
+        <label class="league-option">
+          <input type="checkbox" class="league-checkbox" value="${lg}" ${defaultChecked.has(lg) ? 'checked' : ''}>
+          <span>${lg}</span>
+        </label>
+      `).join('');
+
+      filterCard.innerHTML = `
+        <div class="card-title">Filter Leagues</div>
+        <div class="filter-actions">
+          <button class="btn-action" id="btn-select-all">All</button>
+          <button class="btn-action active" id="btn-big-four">Big 4</button>
+          <button class="btn-action" id="btn-select-none">None</button>
+        </div>
+        <details class="league-dropdown">
+          <summary>Select Individual Leagues</summary>
+          <div class="league-grid">${checkboxesHtml}</div>
+        </details>
+        <button class="btn-action btn-reset" id="btn-reset-view">Zoom Out</button>
+      `;
+
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+      return container;
+    };
+    dashboardControl.addTo(map);
+
+    window.handleGvizResponse = function(response) {
+      if (!response || !response.table) return;
+
+      const cols = response.table.cols.map((c, idx) => (c && c.label) ? c.label.trim() : String.fromCharCode(65 + idx));
+      const rawRows = response.table.rows.map(r => {
+        let rowObj = {};
+        if (r && r.c) {
+          r.c.forEach((cell, idx) => {
+            rowObj[cols[idx] || String.fromCharCode(65 + idx)] = (cell && cell.v !== null) ? cell.v : '';
+          });
+        }
+        return rowObj;
+      });
+
+      function getRowVal(row, possibleKeys) {
+        for (let key of possibleKeys) {
+          for (let rk in row) {
+            if (rk.trim().toLowerCase() === key.toLowerCase()) return row[rk];
+          }
+        }
+        return '';
+      }
+
+      const venueMap = {};
+      const metroSumCoords = {};
+
+      rawRows.forEach(row => {
+        const league = String(getRowVal(row, ['League']) || '').trim();
+        const metro = String(getRowVal(row, ['Metro Area', 'Metro']) || '').trim();
+        const team = String(getRowVal(row, ['Team Name', 'Team']) || '').trim();
+        const venueName = String(getRowVal(row, ['Venue Name', 'Venue']) || '').trim();
+        const venueCity = String(getRowVal(row, ['Venue City', 'City']) || '').trim();
+        const lat = parseFloat(getRowVal(row, ['Latitude', 'Lat']));
+        const lng = parseFloat(getRowVal(row, ['Longitude', 'Lng']));
+        const wikiUrl = String(getRowVal(row, ['Venue Wiki', 'Wiki', 'Wikipedia']) || '').trim();
+
+        if (!venueName || isNaN(lat) || isNaN(lng) || !metro) return;
+
+        const venueKey = `${venueName}_${lat.toFixed(4)}_${lng.toFixed(4)}`;
+        if (!venueMap[venueKey]) {
+          venueMap[venueKey] = { venue: venueName, city: venueCity, metro: metro, coords: [lat, lng], wikiUrl: wikiUrl, teams: [] };
+        }
+        venueMap[venueKey].teams.push({ league: league, name: team });
+
+        if (!metroSumCoords[metro]) metroSumCoords[metro] = { sumLat: 0, sumLng: 0, count: 0 };
+        metroSumCoords[metro].sumLat += lat;
+        metroSumCoords[metro].sumLng += lng;
+        metroSumCoords[metro].count += 1;
+      });
+
+      venues = Object.values(venueMap);
+      metroCenters = {};
+      Object.keys(metroSumCoords).forEach(m => {
+        metroCenters[m] = [metroSumCoords[m].sumLat / metroSumCoords[m].count, metroSumCoords[m].sumLng / metroSumCoords[m].count];
+      });
+
+      const banner = document.getElementById('status-banner');
+      document.getElementById('status-text').textContent = `Live Synced (${venues.length} venues loaded)`;
+      setTimeout(() => { banner.style.opacity = '0'; }, 2500);
+
+      updateMap();
+    };
+
+    function loadGoogleSheetData() {
+      const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=responseHandler:handleGvizResponse&gid=${SHEET_GID}`;
+      const script = document.createElement('script');
+      script.src = gvizUrl;
+      document.body.appendChild(script);
+    }
+
+    document.addEventListener('change', function(e) {
+      if (e.target && e.target.classList.contains('league-checkbox')) {
+        handleFilterChange();
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target) return;
+      if (e.target.id === 'btn-select-all') {
+        document.querySelectorAll('.league-checkbox').forEach(cb => cb.checked = true);
+        handleFilterChange();
+      } else if (e.target.id === 'btn-big-four') {
+        const bigFour = new Set(['NFL', 'MLB', 'NBA', 'NHL']);
+        document.querySelectorAll('.league-checkbox').forEach(cb => { cb.checked = bigFour.has(cb.value); });
+        handleFilterChange();
+      } else if (e.target.id === 'btn-select-none') {
+        document.querySelectorAll('.league-checkbox').forEach(cb => cb.checked = false);
+        handleFilterChange();
+      } else if (e.target.id === 'btn-reset-view') {
+        resetToDefaultView();
+      }
+    });
+
+    // Zoom back out to metro area when clicking anywhere on the open map away from a venue
+    map.on('click', () => {
+      if (activeVenueKey && lastZoomedMetro) {
+        activeVenueKey = null;
+        zoomToMetroArea(lastZoomedMetro);
+      }
+    });
+
+    map.on('zoomend', updateMap);
+    loadGoogleSheetData();
+  </script>
+</body>
+</html>
