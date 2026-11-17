@@ -3,129 +3,131 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Pro Sports by Metro Area</title>
+  <title>Pro Leagues Explorer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     html, body { 
-      margin: 0; 
-      padding: 0; 
-      width: 100%;
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      margin: 0; padding: 0; width: 100%; height: 100%; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      background: #0f172a;
     }
 
-    #map { 
-      height: 100vh; 
-      height: 100dvh; 
-      width: 100vw; 
-    }
-
-    /* Top Title Header */
-    #top-header {
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.90);
-      color: #ffffff;
-      padding: 8px 18px;
-      border-radius: 20px;
-      font-size: 15px;
-      font-weight: 700;
-      z-index: 10000;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
-      backdrop-filter: blur(4px);
-      letter-spacing: 0.5px;
-      pointer-events: none;
-      text-align: center;
-      white-space: nowrap;
-    }
-
-    /* Sync Indicator Status Banner */
-    #status-banner {
-      position: absolute;
-      top: 52px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 23, 42, 0.88);
-      color: #f8fafc;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 10px;
-      font-weight: 600;
-      z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    #dashboard-wrapper {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      pointer-events: none;
-      transition: opacity 0.4s ease;
-    }
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
     }
 
-    /* Attribution Offset */
-    .leaflet-bottom.leaflet-left {
-      bottom: 28px !important;
-      left: 10px !important;
+    /* Left Sidebar Tree */
+    #sidebar {
+      width: 340px;
+      background: #ffffff;
+      height: 100%;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
 
-    .dashboard-container {
+    /* Center Map Container */
+    #map-container {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    #map { width: 100%; height: 100%; }
+
+    /* Right Explorer Panel */
+    #explorer-panel {
+      width: 380px;
+      background: #ffffff;
+      height: 100%;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      box-sizing: border-box;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 1100px) {
+      #dashboard-wrapper { flex-direction: column; }
+      
+      /* Map takes 38% height on mobile */
+      #map-container { 
+        height: 38vh !important; 
+        order: 1; 
+        width: 100%;
+      }
+
+      /* Panels take remaining bottom space stacked without tabs */
+      #sidebar {
+        width: 100% !important;
+        height: 62vh !important;
+        order: 2;
+        display: flex !important;
+      }
+
+      #explorer-panel {
+        width: 100% !important;
+        height: 62vh !important;
+        order: 2;
+        display: none !important;
+      }
+
+      #explorer-panel.mobile-active {
+        display: flex !important;
+      }
+      #sidebar.mobile-hidden {
+        display: none !important;
+      }
+    }
+
+    .sidebar-header, .panel-header {
+      display: none !important;
+    }
+
+    /* Prominent Navigation Bars matching heading style */
+    .nav-bar-banner {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 800;
       display: flex;
       flex-direction: column;
       gap: 8px;
-      max-width: 90vw;
-      box-sizing: border-box;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
 
-    .dashboard-card {
-      background: rgba(255, 255, 255, 0.96);
-      padding: 10px 12px;
-      border-radius: 8px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.22);
-      backdrop-filter: blur(4px);
-      box-sizing: border-box;
+    .filter-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
     }
 
-    /* Filter Card */
-    .filter-card {
-      min-width: 175px;
-      max-height: 50vh;
-      overflow-y: auto;
-    }
-
-    .card-title {
-      font-weight: 800;
-      font-size: 11px;
-      margin-bottom: 6px;
-      color: #0f172a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1.5px solid #e2e8f0;
-      padding-bottom: 4px;
-    }
-
-    .filter-actions { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
-    
     .btn-action {
-      background: #f1f5f9;
+      background: #ffffff;
       border: 1.5px solid #cbd5e1;
       border-radius: 4px;
-      padding: 3px 8px;
+      padding: 4px 6px;
       font-size: 10px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       color: #334155;
+      flex: 1;
       transition: all 0.15s ease;
-      touch-action: manipulation;
+      text-align: center;
     }
-    .btn-action:hover { background: #e2e8f0; color: #0f172a; }
+    .btn-action:hover { background: #f1f5f9; color: #0f172a; }
     .btn-action.active {
       background: #0284c7;
       color: #ffffff;
@@ -134,472 +136,570 @@
       box-shadow: 0 0 0 1.5px rgba(2, 132, 199, 0.4);
     }
 
-    .btn-reset {
-      background: #f1f5f9;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-      width: 100%;
-      margin-top: 8px;
+    /* Fixed scrolling container for sidebar tree */
+    .sidebar-content {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
-    .btn-reset:hover { background: #e2e8f0; color: #0f172a; }
 
-    /* HTML Details / Summary Dropdown */
-    .league-dropdown {
-      margin-top: 4px;
-      border-top: 1px solid #e2e8f0;
-      padding-top: 6px;
+    .section-heading {
+      font-size: 10px;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 4px 0 2px 4px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2px;
+      flex-shrink: 0;
     }
-    .league-dropdown summary {
-      font-size: 11px;
+
+    /* League Accordion Card */
+    .conf-group {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fff;
+      margin-bottom: 2px;
+      flex-shrink: 0;
+    }
+
+    .conf-summary {
+      padding: 8px 10px;
       font-weight: 700;
+      font-size: 11px;
       color: #0f172a;
-      cursor: pointer;
-      user-select: none;
-      outline: none;
-      list-style: none;
+      background: #f8fafc;
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-    .league-dropdown summary::-webkit-details-marker {
-      display: none;
-    }
-    .league-dropdown summary::after {
-      content: '▾';
-      font-size: 10px;
-      color: #64748b;
-    }
-    .league-dropdown[open] summary::after {
-      content: '▴';
-    }
-
-    .league-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      margin-top: 6px;
-      padding-left: 2px;
-    }
-    .league-option {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      margin: 2px 0;
       cursor: pointer;
       user-select: none;
+      border-radius: 6px;
     }
-    .league-option input[type="checkbox"] {
-      cursor: pointer;
-      accent-color: #0284c7;
-      width: 15px;
-      height: 15px;
+    .conf-summary:hover { background: #f1f5f9; }
+
+    .conf-info-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
     }
 
-    /* National Zoom Compact Metro Circle Badge */
-    .metro-box-icon { background: transparent; border: none; }
-    .metro-circle-badge {
+    .conf-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .conf-toggle-arrow {
+      color: #64748b;
+      font-size: 9px;
+    }
+
+    .school-list {
+      padding: 4px 10px 8px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 1px solid #f1f5f9;
+      background: #ffffff;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .school-item {
+      display: flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      padding: 2px 0;
+    }
+    .school-name:hover { color: #0284c7; text-decoration: underline; }
+    .school-item.selected-active .school-name { color: #0284c7; font-weight: 800; }
+
+    .panel-body {
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+
+    .venue-photo-container {
+      width: 100%;
+      height: 130px;
+      background: #f1f5f9;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      font-weight: 800;
-      font-size: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-      cursor: pointer;
-      transform: translate(-50%, -50%);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .metro-circle-badge:hover {
-      transform: translate(-50%, -50%) scale(1.25);
-      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-      z-index: 9999 !important;
+      flex-shrink: 0;
     }
 
-    /* Metro Hover Tooltip */
-    .metro-tooltip {
-      background: rgba(15, 23, 42, 0.92) !important;
-      border: 1px solid rgba(255, 255, 255, 0.2) !important;
-      border-radius: 6px !important;
-      color: #ffffff !important;
-      font-size: 11px !important;
-      font-weight: 700 !important;
-      padding: 4px 8px !important;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-      white-space: nowrap !important;
+    .venue-photo-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
-    /* Monochromatic Blue Gradient Tiers */
-    .metro-tier-1 { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0c4a6e; border: 1.5px solid #ffffff; }
-    .metro-tier-2 { background: linear-gradient(135deg, #7dd3fc, #38bdf8); color: #082f49; border: 1.5px solid #ffffff; }
-    .metro-tier-3 { background: linear-gradient(135deg, #0284c7, #0369a1); color: #ffffff; border: 1.5px solid #ffffff; }
-    .metro-tier-4 { background: linear-gradient(135deg, #1d4ed8, #1e3a8a); color: #ffffff; border: 1.5px solid #ffffff; }
-    .metro-tier-5 { background: linear-gradient(135deg, #0f2b5c, #051329); color: #ffffff; border: 1.5px solid #93c5fd; box-shadow: 0 2px 8px rgba(5, 19, 41, 0.6); }
-
-    /* Standard Reliable Venue Tooltip */
-    .venue-tooltip {
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      color: #0f172a;
+    .photo-placeholder {
+      color: #94a3b8;
       font-size: 11px;
       font-weight: 600;
-      padding: 2px 6px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      cursor: pointer;
-      pointer-events: auto !important;
-      white-space: nowrap;
+      text-align: center;
+      padding: 12px;
     }
 
-    /* Pop-up Styling */
-    .popup-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; color: #1a202c; }
-    .popup-subtitle { font-size: 11px; color: #718096; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
-    .team-item { font-size: 12px; margin: 3px 0; line-height: 1.4; color: #2d3748; }
-    .venue-name-sub { font-size: 11px; color: #64748b; font-weight: 400; margin-left: 2px; }
-    .league-badge { font-weight: 700; font-size: 10px; color: #fff; background: #475569; padding: 1px 4px; border-radius: 3px; margin-right: 5px; display: inline-block; }
-    .wiki-link { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #0284c7; text-decoration: none; font-weight: 600; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0; width: 100%; }
-    .wiki-link:hover { color: #0369a1; text-decoration: underline; }
+    .team-title { font-size: 15px; font-weight: 800; color: #0f172a; margin: 0; }
+    .team-subtitle { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700; margin-top: 1px; }
+
+    .conf-badge-large {
+      display: inline-block;
+      font-weight: 800;
+      font-size: 9px;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .info-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+
+    .info-label { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+    .info-value { font-size: 11px; font-weight: 700; color: #0f172a; margin-top: 1px; }
+
+    .notes-box {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 10px;
+      color: #92400e;
+      line-height: 1.3;
+    }
+
+    .wiki-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #0284c7;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 11px;
+      transition: background 0.15s ease;
+    }
+    .wiki-btn:hover { background: #0369a1; }
+
+    .back-conf-btn {
+      background: #334155;
+      color: #ffffff;
+      border: 1.5px solid #475569;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+      flex: 1;
+      box-sizing: border-box;
+    }
+    .back-conf-btn:hover { background: #475569; color: #ffffff; }
+
+    .venue-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-size: 11px; font-weight: 600; padding: 3px 7px; }
   </style>
 </head>
 <body>
-  <div id="top-header">Pro Sports by Metro Area</div>
 
-  <div id="status-banner">
-    <span class="status-dot"></span>
-    <span id="status-text">Connecting to Google Sheets...</span>
+  <div id="dashboard-wrapper">
+    <!-- Left Sidebar: Pro Leagues -->
+    <div id="sidebar">
+      <div class="nav-bar-banner">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Pro Leagues</span>
+          <span id="active-count" style="font-size: 11px; font-weight: 600; opacity: 0.9;">Loading...</span>
+        </div>
+        <div style="display: flex; gap: 4px; width: 100%;">
+          <button class="btn-action active" id="btn-select-all" style="background:#334155; border-color:#475569; color:#fff;">All</button>
+          <button class="btn-action" id="btn-big-4" style="background:#334155; border-color:#475569; color:#fff;">Big 4</button>
+          <button class="btn-action" id="btn-select-none" style="background:#334155; border-color:#475569; color:#fff;">None</button>
+        </div>
+      </div>
+      <div class="sidebar-content" id="sidebar-tree"></div>
+    </div>
+
+    <!-- Center Map -->
+    <div id="map-container">
+      <div id="map"></div>
+    </div>
+
+    <!-- Right Explorer Panel: Team & Venue Details -->
+    <div id="explorer-panel">
+      <div class="nav-bar-banner">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Team & Venue Details</span>
+        </div>
+        <div style="display: flex; gap: 4px; width: 100%;">
+          <button class="back-conf-btn" id="back-to-conf-btn">&larr; Back to Leagues</button>
+          <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
+          <button class="back-conf-btn" id="next-venue-btn">Next</button>
+        </div>
+      </div>
+      <div class="panel-body" id="panel-content">
+        <div class="venue-photo-container">
+          <div class="photo-placeholder">Click any stadium marker on the map or team name in the sidebar to inspect details and Wikipedia photos.</div>
+        </div>
+        <div>
+          <h2 class="team-title">Select a Team</h2>
+          <div class="team-subtitle">Interactive Dashboard</div>
+        </div>
+      </div>
+    </div>
   </div>
-
-  <div id="map"></div>
 
   <script>
     const SPREADSHEET_ID = "1XHaT57dHhRLtMojDEXhMn8AMScxz5F7WBe1i8y6NIe4";
-    const SHEET_GID = "512966518";
+    const SHEET_NAME = "Pro";
 
-    const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19
-    });
+    const LEAGUE_COLORS = {
+      "NFL": "#0284c7",   /* Blue */
+      "MLB": "#dc2626",   /* Red */
+      "NBA": "#ea580c",   /* Orange */
+      "NHL": "#4f46e5",   /* Indigo */
+      "MLS": "#16a34a",   /* Green */
+      "NWSL": "#db2777",  /* Pink */
+      "WNBA": "#9333ea"   /* Purple */
+    };
 
-    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri',
-      maxZoom: 18
-    });
+    const BIG_4 = new Set(["NFL", "MLB", "NBA", "NHL"]);
+    const BIG_4_ORDER = ["NFL", "MLB", "NBA", "NHL"];
+    const OTHER_LEAGUES_ORDER = ["MLS", "NWSL", "WNBA"];
 
-    const map = L.map('map', { 
-      zoomControl: true,
-      layers: [osmStandard]
-    }).setView([39.8283, -98.5795], 4);
+    const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, noWrap: true });
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, noWrap: true });
 
+    const initialZoom = window.innerWidth <= 1100 ? 3 : 4;
+    const map = L.map('map', { zoomControl: true, minZoom: 3, layers: [osmStandard] }).setView([39.8283, -98.5795], initialZoom);
     let activeBasemapLayer = osmStandard;
-
-    map.createPane('venuePane');
-    map.getPane('venuePane').style.zIndex = 500;
-
-    map.createPane('metroBadgePane');
-    map.getPane('metroBadgePane').style.zIndex = 650;
-
-    const metroLayer = L.layerGroup().addTo(map);
     const venueLayer = L.layerGroup().addTo(map);
 
     let venues = [];
-    let metroCenters = {};
-    let activeMetro = null;
-    let activeVenueKey = null;
-    let lastZoomedMetro = null;
-    let refreshInProgress = false;
-    let initialFitDone = false;
-    let isZoomingToVenue = false;
+    let currentFilteredVenues = [];
+    let currentVenueIndex = -1;
+    let markersMap = {}; 
+    let activeLeague = null;
 
-    function getTeamTierClass(count) {
-      if (count >= 11) return "metro-tier-5";
-      if (count >= 8)  return "metro-tier-4";
-      if (count >= 5)  return "metro-tier-3";
-      if (count >= 3)  return "metro-tier-2";
-      return "metro-tier-1";
+    function getNationalZoom() {
+      return window.innerWidth <= 1100 ? 3 : 4;
     }
 
     function updateBasemapForZoom() {
       const currentZoom = map.getZoom();
       let targetLayer = currentZoom <= 6 ? osmStandard : esriSatellite;
-
       if (activeBasemapLayer !== targetLayer) {
-        if (map.hasLayer(activeBasemapLayer)) {
-          map.removeLayer(activeBasemapLayer);
-        }
+        if (map.hasLayer(activeBasemapLayer)) map.removeLayer(activeBasemapLayer);
         map.addLayer(targetLayer);
         activeBasemapLayer = targetLayer;
       }
     }
 
-    function updateFilterButtonState() {
-      const allCheckboxes = Array.from(document.querySelectorAll('.league-checkbox'));
-      const checkedValues = new Set(allCheckboxes.filter(cb => cb.checked).map(cb => cb.value));
-      const bigFour = new Set(['NFL', 'MLB', 'NBA', 'NHL']);
-
-      const btnAll = document.getElementById('btn-select-all');
-      const btnBig4 = document.getElementById('btn-big-four');
-      const btnNone = document.getElementById('btn-select-none');
-
-      if (!btnAll || !btnBig4 || !btnNone) return;
-
-      btnAll.classList.remove('active');
-      btnBig4.classList.remove('active');
-      btnNone.classList.remove('active');
-
-      if (checkedValues.size === 0) {
-        btnNone.classList.add('active');
-      } else if (checkedValues.size === allCheckboxes.length) {
-        btnAll.classList.add('active');
-      } else if (checkedValues.size === 4 && [...bigFour].every(v => checkedValues.has(v))) {
-        btnBig4.classList.add('active');
-      }
-    }
-
-    function resetToDefaultView() {
-      activeVenueKey = null;
-      activeMetro = null;
-      lastZoomedMetro = null;
-      
-      const selectedLeagues = new Set(
-        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
-      );
-      const activeCoords = venues
-        .filter(v => v.teams.some(t => selectedLeagues.has(t.league)))
-        .map(v => v.coords);
-
-      if (activeCoords.length > 0) {
-        const bounds = L.latLngBounds(activeCoords);
-        map.fitBounds(bounds, { padding: [40, 40] });
+    function showMobilePanel(panelType) {
+      const sidebar = document.getElementById('sidebar');
+      const explorer = document.getElementById('explorer-panel');
+      if (panelType === 'explorer') {
+        explorer.classList.add('mobile-active');
+        sidebar.classList.add('mobile-hidden');
       } else {
-        map.setView([39.8283, -98.5795], 4);
+        explorer.classList.remove('mobile-active');
+        sidebar.classList.remove('mobile-hidden');
       }
+      setTimeout(() => { map.invalidateSize(); }, 100);
     }
 
-    function zoomToMetroArea(mName) {
-      const selectedLeagues = new Set(
-        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
-      );
-
-      const activeMetroVenues = venues.filter(v => 
-        v.metro === mName && v.teams.some(t => selectedLeagues.has(t.league))
-      );
-
-      if (activeMetroVenues.length === 0) return;
-
-      if (activeMetroVenues.length > 1) {
-        let bounds = L.latLngBounds(activeMetroVenues.map(v => v.coords));
-        map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 14, duration: 0.8 });
-      } else {
-        map.flyTo(activeMetroVenues[0].coords, 14, { duration: 0.8 });
-      }
-    }
-
-    function handleFilterChange() {
-      updateMap();
-      if (lastZoomedMetro) {
-        zoomToMetroArea(lastZoomedMetro);
-      }
-    }
-
-    function updateMap() {
-      if (venues.length === 0 || isZoomingToVenue) return;
-
-      updateBasemapForZoom();
-      updateFilterButtonState();
-
-      const selectedLeagues = new Set(
-        Array.from(document.querySelectorAll('.league-checkbox:checked')).map(cb => cb.value)
-      );
-
-      refreshInProgress = true;
-      metroLayer.clearLayers();
-      venueLayer.clearLayers();
-
-      const currentZoom = map.getZoom();
-      const isOverview = currentZoom <= 6;
-
-      const metroTeamsMap = {};
-      const metroVenuesMap = {};
-      Object.keys(metroCenters).forEach(m => {
-        metroTeamsMap[m] = [];
-        metroVenuesMap[m] = [];
-      });
-
-      const activeVenuesList = [];
-      venues.forEach(v => {
-        const activeTeamsAtVenue = v.teams.filter(t => selectedLeagues.has(t.league));
-        if (activeTeamsAtVenue.length > 0) {
-          if (!metroVenuesMap[v.metro]) metroVenuesMap[v.metro] = [];
-          if (!metroTeamsMap[v.metro]) metroTeamsMap[v.metro] = [];
-
-          metroVenuesMap[v.metro].push(v);
-          activeTeamsAtVenue.forEach(t => {
-            metroTeamsMap[v.metro].push({ league: t.league, name: t.name, venue: v.venue });
-          });
-          activeVenuesList.push({ venueObj: v, activeTeams: activeTeamsAtVenue });
-        }
-      });
-
-      if (!initialFitDone && activeVenuesList.length > 0) {
-        initialFitDone = true;
-        resetToDefaultView();
-      }
-
-      Object.keys(metroCenters).forEach(mName => {
-        const activeTeamList = metroTeamsMap[mName] || [];
-        const teamCount = activeTeamList.length;
-
-        if (teamCount > 0) {
-          const tierClass = getTeamTierClass(teamCount);
-          const teamListHtml = activeTeamList.map(t => 
-            `<div class="team-item"><span class="league-badge">${t.league}</span><b>${t.name}</b> <span class="venue-name-sub">(${t.venue})</span></div>`
-          ).join('');
-
-          const popupContent = `
-            <div class="popup-title">${mName}</div>
-            <div class="popup-subtitle">Total Teams Active: <b>${teamCount}</b></div>
-            ${teamListHtml}
-          `;
-
-          let marker;
-          const handleMetroClick = function(e) {
-            L.DomEvent.stopPropagation(e);
-            activeVenueKey = null;
-
-            if (activeMetro !== mName) {
-              activeMetro = mName;
-              lastZoomedMetro = mName;
-              zoomToMetroArea(mName);
-            } else if (marker) {
-              marker.openPopup();
-            }
-          };
-
-          if (isOverview) {
-            const metroIcon = L.divIcon({
-              className: 'metro-box-icon',
-              html: `<div class="metro-circle-badge ${tierClass}">${teamCount}</div>`,
-              iconSize: null
-            });
-            marker = L.marker(metroCenters[mName], { 
-              icon: metroIcon,
-              pane: 'metroBadgePane'
-            }).addTo(metroLayer);
-
-            marker.bindTooltip(`<b>${mName}</b><br><span style="font-size:10px; opacity:0.8;">${teamCount} Active Teams</span>`, {
-              className: 'metro-tooltip',
-              direction: 'top',
-              offset: [0, -12],
-              opacity: 0.95
-            });
-
-            marker.bindPopup(popupContent, { autoPan: true, autoPanPadding: [60, 20] });
-            marker.on('click', handleMetroClick);
-          }
-        }
-      });
-
-      // Plot Venues
-      activeVenuesList.forEach(item => {
-        const v = item.venueObj;
-        const activeTeams = item.activeTeams;
-
-        const marker = L.circleMarker(v.coords, {
-          pane: 'venuePane',
-          radius: 6,
-          fillColor: "#dc2626",
-          color: "#ffffff",
-          weight: 1.5,
-          opacity: 1,
-          fillOpacity: 0.95
-        }).addTo(venueLayer);
-
-        const shortTeamSummary = activeTeams.map(t => t.name).join(', ');
-        const teamRows = activeTeams.map(t => `<div class="team-item"><span class="league-badge">${t.league}</span><b>${t.name}</b></div>`).join('');
-        const wikiUrl = v.wikiUrl && v.wikiUrl.startsWith('http') ? v.wikiUrl : `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(v.venue + ' ' + v.city)}`;
-
-        const popupMarkup = `
-          <div class="popup-title">${v.venue}</div>
-          <div class="popup-subtitle">${v.city} &bull; Metro: ${v.metro}</div>
-          ${teamRows}
-          <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-link">Wikipedia: ${v.venue} &rarr;</a>
-        `;
-
-        const venuePopup = L.popup({ autoPan: false, className: 'venue-popup-marker' }).setContent(popupMarkup);
-        marker.bindPopup(venuePopup);
-
-        const handleVenueClick = function(e) {
-          L.DomEvent.stopPropagation(e);
-          activeVenueKey = v.venue;
-          lastZoomedMetro = v.metro;
-          isZoomingToVenue = true;
-          
-          map.flyTo(v.coords, 15, { duration: 0.8 });
-          marker.openPopup();
-
-          setTimeout(() => {
-            isZoomingToVenue = false;
-          }, 900);
-        };
-
-        marker.on('click', handleVenueClick);
-
-        if (!isOverview) {
-          marker.bindTooltip(`<b>${v.venue}</b><br><span style="color:#64748b; font-size:10px;">${shortTeamSummary}</span>`, {
-            permanent: true,
-            direction: 'top',
-            className: 'venue-tooltip',
-            offset: [0, -8],
-            interactive: true
-          });
-        }
-      });
-
-      refreshInProgress = false;
-    }
-
-    // Dashboard Control: Quick Filter Header + Dropdown
-    const dashboardControl = L.control({ position: 'bottomleft' });
-    dashboardControl.onAdd = function() {
-      const container = L.DomUtil.create('div', 'dashboard-container');
-      const orderedLeagues = ["NFL", "MLB", "NBA", "NHL", "MLS", "NWSL", "WNBA"];
-      const defaultChecked = new Set(["NFL", "MLB", "NBA", "NHL"]);
-
-      const filterCard = L.DomUtil.create('div', 'dashboard-card filter-card', container);
-
-      let checkboxesHtml = orderedLeagues.map(lg => `
-        <label class="league-option">
-          <input type="checkbox" class="league-checkbox" value="${lg}" ${defaultChecked.has(lg) ? 'checked' : ''}>
-          <span>${lg}</span>
-        </label>
-      `).join('');
-
-      filterCard.innerHTML = `
-        <div class="card-title">Filter Leagues</div>
-        <div class="filter-actions">
-          <button class="btn-action" id="btn-select-all">All</button>
-          <button class="btn-action active" id="btn-big-four">Big 4</button>
-          <button class="btn-action" id="btn-select-none">None</button>
+    function resetRightPanel() {
+      currentVenueIndex = -1;
+      const panelContent = document.getElementById('panel-content');
+      panelContent.innerHTML = `
+        <div class="venue-photo-container">
+          <div class="photo-placeholder">Click any stadium marker on the map or team name in the sidebar to inspect details and Wikipedia photos.</div>
         </div>
-        <details class="league-dropdown">
-          <summary>Select Individual Leagues</summary>
-          <div class="league-grid">${checkboxesHtml}</div>
-        </details>
-        <button class="btn-action btn-reset" id="btn-reset-view">Zoom Out</button>
+        <div>
+          <h2 class="team-title">Select a Team</h2>
+          <div class="team-subtitle">Interactive Dashboard</div>
+        </div>
+      `;
+      document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
+      if (window.innerWidth <= 1100) {
+        showMobilePanel('sidebar');
+      }
+    }
+
+    async function fetchWikiImage(wikiUrl, venueName) {
+      let titles = [];
+      if (wikiUrl && wikiUrl.includes('/wiki/')) {
+        let slug = wikiUrl.split('/wiki/')[1];
+        titles.push(slug);
+      }
+      titles.push(encodeURIComponent(venueName));
+
+      for (let t of titles) {
+        const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=600&titles=${t}&origin=*`;
+        try {
+          const response = await fetch(apiUrl);
+          const data = await response.json();
+          const pages = data.query.pages;
+          for (let id in pages) {
+            if (pages[id].thumbnail && pages[id].thumbnail.source) {
+              return pages[id].thumbnail.source;
+            }
+          }
+        } catch (e) {
+          console.log("Wiki fetch error for title:", t);
+        }
+      }
+      return null;
+    }
+
+    async function showVenueDetails(v, index = -1) {
+      if (index !== -1) {
+        currentVenueIndex = index;
+      } else {
+        currentVenueIndex = currentFilteredVenues.findIndex(item => item.team === v.team);
+      }
+
+      const color = LEAGUE_COLORS[v.league] || "#475569";
+      const capacityStr = v.capacity ? Number(v.capacity).toLocaleString() : 'N/A';
+      const wikiUrl = v.wikiUrl && v.wikiUrl.startsWith('http') ? v.wikiUrl : `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(v.venue + ' ' + v.team)}`;
+
+      const panelContent = document.getElementById('panel-content');
+      panelContent.innerHTML = `
+        <div class="venue-photo-container" id="photo-box">
+          <div class="photo-placeholder">Loading Wikipedia photo...</div>
+        </div>
+        <div>
+          <span class="conf-badge-large" style="background:${color};">${v.league}</span>
+          <h2 class="team-title">${v.team}</h2>
+          <div class="team-subtitle">${v.venueCity}</div>
+        </div>
+        <div class="info-grid">
+          <div class="info-card">
+            <div class="info-label">Venue Name</div>
+            <div class="info-value" style="font-size: 11px; margin-top:2px;">${v.venue}</div>
+          </div>
+          <div class="info-card">
+            <div class="info-label">Capacity</div>
+            <div class="info-value">${capacityStr}</div>
+          </div>
+        </div>
+        <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-btn">View on Wikipedia &rarr;</a>
+        ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
       `;
 
-      L.DomEvent.disableClickPropagation(container);
-      L.DomEvent.disableScrollPropagation(container);
-      return container;
-    };
-    dashboardControl.addTo(map);
+      if (window.innerWidth <= 1100) {
+        showMobilePanel('explorer');
+      }
+
+      document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
+      const activeEl = document.getElementById(`school-item-${v.team.replace(/\s+/g, '_')}`);
+      if (activeEl) {
+        activeEl.classList.add('selected-active');
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      const imgUrl = await fetchWikiImage(v.wikiUrl, v.venue);
+      const photoBox = document.getElementById('photo-box');
+      if (photoBox) {
+        if (imgUrl) {
+          photoBox.innerHTML = `<img src="${imgUrl}" alt="${v.venue}">`;
+        } else {
+          photoBox.innerHTML = `<div class="photo-placeholder">No Wikipedia photo available</div>`;
+        }
+      }
+    }
+
+    function renderSidebarTree(groupedData) {
+      const container = document.getElementById('sidebar-tree');
+      container.innerHTML = '';
+
+      function renderGroupList(title, leagueNames) {
+        const heading = document.createElement('div');
+        heading.className = 'section-heading';
+        heading.textContent = title;
+        container.appendChild(heading);
+
+        leagueNames.forEach(league => {
+          if (!groupedData[league]) return;
+          const teams = groupedData[league].sort((a, b) => a.team.localeCompare(b.team));
+          const color = LEAGUE_COLORS[league] || "#475569";
+
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'conf-group';
+
+          const summaryDiv = document.createElement('div');
+          summaryDiv.className = 'conf-summary';
+          summaryDiv.innerHTML = `
+            <div class="conf-info-left">
+              <span class="conf-swatch" style="background:${color};"></span>
+              <span><b>${league}</b> (${teams.length})</span>
+            </div>
+            <span class="conf-toggle-arrow">▼</span>
+          `;
+
+          const listDiv = document.createElement('div');
+          listDiv.className = 'school-list';
+          listDiv.style.display = 'none';
+
+          summaryDiv.addEventListener('click', () => {
+            const isHidden = listDiv.style.display === 'none';
+
+            document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+
+            if (isHidden) {
+              listDiv.style.display = 'flex';
+              summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
+              activeLeague = league;
+            } else {
+              activeLeague = null;
+            }
+
+            ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
+              const btn = document.getElementById(id);
+              if (btn) btn.style.background = '#334155';
+            });
+
+            updateMapFilters();
+            map.setView([39.8283, -98.5795], getNationalZoom());
+            resetRightPanel();
+          });
+
+          teams.forEach(v => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'school-item';
+            itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
+            itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
+
+            itemDiv.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+              map.flyTo(v.coords, 15, { duration: 0.8 });
+              if (markersMap[v.team]) {
+                markersMap[v.team].openPopup();
+              }
+              showVenueDetails(v, globalIdx);
+            });
+
+            listDiv.appendChild(itemDiv);
+          });
+
+          groupDiv.appendChild(summaryDiv);
+          groupDiv.appendChild(listDiv);
+          container.appendChild(groupDiv);
+        });
+      }
+
+      const availableBig4 = BIG_4_ORDER.filter(l => groupedData[l]);
+      const availableOthers = OTHER_LEAGUES_ORDER.filter(l => groupedData[l]);
+
+      renderGroupList("Big 4 Leagues", availableBig4);
+      renderGroupList("Other Leagues", availableOthers);
+
+      updateMapFilters();
+    }
+
+    function updateMapFilters() {
+      venueLayer.clearLayers();
+      markersMap = {};
+      currentFilteredVenues = [];
+
+      venues.forEach(v => {
+        let show = false;
+        if (activeLeague) {
+          show = (v.league === activeLeague);
+        } else {
+          const btnAll = document.getElementById('btn-select-all');
+          const btnBig4 = document.getElementById('btn-big-4');
+          const btnNone = document.getElementById('btn-select-none');
+
+          if (btnAll.classList.contains('active')) show = true;
+          else if (btnBig4.classList.contains('active')) show = BIG_4.has(v.league);
+          else if (btnNone.classList.contains('active')) show = false;
+          else show = true;
+        }
+
+        if (show) {
+          currentFilteredVenues.push(v);
+          const color = LEAGUE_COLORS[v.league] || "#475569";
+          const marker = L.circleMarker(v.coords, {
+            radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
+          }).addTo(venueLayer);
+
+          marker.on('click', () => {
+            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+            map.flyTo(v.coords, 15, { duration: 0.8 });
+            showVenueDetails(v, globalIdx);
+          });
+
+          marker.bindTooltip(`<b>${v.team}</b>`, { direction: 'top', className: 'venue-tooltip', offset: [0, -8] });
+          markersMap[v.team] = marker;
+        }
+      });
+
+      document.getElementById('active-count').textContent = `${currentFilteredVenues.length} of ${venues.length} teams shown`;
+      updateBasemapForZoom();
+    }
+
+    function setActiveFilterButton(btnId) {
+      ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.classList.remove('active');
+        btn.style.background = '#334155';
+        btn.style.borderColor = '#475569';
+      });
+      const activeBtn = document.getElementById(btnId);
+      activeBtn.classList.add('active');
+      activeBtn.style.background = '#0284c7';
+      activeBtn.style.borderColor = '#0369a1';
+
+      activeLeague = null;
+      document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+      map.setView([39.8283, -98.5795], getNationalZoom());
+      resetRightPanel();
+    }
 
     window.handleGvizResponse = function(response) {
       if (!response || !response.table) return;
-
       const cols = response.table.cols.map((c, idx) => (c && c.label) ? c.label.trim() : String.fromCharCode(65 + idx));
       const rawRows = response.table.rows.map(r => {
         let rowObj = {};
@@ -620,86 +720,88 @@
         return '';
       }
 
-      const venueMap = {};
-      const metroSumCoords = {};
+      venues = [];
+      const grouped = {};
 
       rawRows.forEach(row => {
         const league = String(getRowVal(row, ['League']) || '').trim();
-        const metro = String(getRowVal(row, ['Metro Area', 'Metro']) || '').trim();
-        const team = String(getRowVal(row, ['Team Name', 'Team']) || '').trim();
-        const venueName = String(getRowVal(row, ['Venue Name', 'Venue']) || '').trim();
-        const venueCity = String(getRowVal(row, ['Venue City', 'City']) || '').trim();
+        const team = String(getRowVal(row, ['Team', 'Team Name', 'Franchise', 'Club']) || '').trim();
+        const venueName = String(getRowVal(row, ['Venue Name', 'Stadium', 'Venue']) || '').trim();
+        const venueCity = String(getRowVal(row, ['City', 'Venue City']) || '').trim();
+        const capacity = getRowVal(row, ['Capacity', 'Seating Capacity', 'Venue Capacity']);
+        const notes = String(getRowVal(row, ['Notes', 'Notes (as needed)']) || '').trim();
         const lat = parseFloat(getRowVal(row, ['Latitude', 'Lat']));
         const lng = parseFloat(getRowVal(row, ['Longitude', 'Lng']));
         const wikiUrl = String(getRowVal(row, ['Venue Wiki', 'Wiki', 'Wikipedia']) || '').trim();
 
-        if (!venueName || isNaN(lat) || isNaN(lng) || !metro) return;
+        if (!league || !venueName || isNaN(lat) || isNaN(lng) || !team) return;
+        const vObj = { league, team, venue: venueName, venueCity, capacity, notes, coords: [lat, lng], wikiUrl };
+        venues.push(vObj);
 
-        const venueKey = `${venueName}_${lat.toFixed(4)}_${lng.toFixed(4)}`;
-        if (!venueMap[venueKey]) {
-          venueMap[venueKey] = { venue: venueName, city: venueCity, metro: metro, coords: [lat, lng], wikiUrl: wikiUrl, teams: [] };
-        }
-        venueMap[venueKey].teams.push({ league: league, name: team });
-
-        if (!metroSumCoords[metro]) metroSumCoords[metro] = { sumLat: 0, sumLng: 0, count: 0 };
-        metroSumCoords[metro].sumLat += lat;
-        metroSumCoords[metro].sumLng += lng;
-        metroSumCoords[metro].count += 1;
+        if (!grouped[league]) grouped[league] = [];
+        grouped[league].push(vObj);
       });
 
-      venues = Object.values(venueMap);
-      metroCenters = {};
-      Object.keys(metroSumCoords).forEach(m => {
-        metroCenters[m] = [metroSumCoords[m].sumLat / metroSumCoords[m].count, metroSumCoords[m].sumLng / metroSumCoords[m].count];
-      });
-
-      const banner = document.getElementById('status-banner');
-      document.getElementById('status-text').textContent = `Live Synced (${venues.length} venues loaded)`;
-      setTimeout(() => { banner.style.opacity = '0'; }, 2500);
-
-      updateMap();
+      renderSidebarTree(grouped);
     };
 
-    function loadGoogleSheetData() {
-      const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=responseHandler:handleGvizResponse&gid=${SHEET_GID}`;
-      const script = document.createElement('script');
-      script.src = gvizUrl;
-      document.body.appendChild(script);
-    }
-
-    document.addEventListener('change', function(e) {
-      if (e.target && e.target.classList.contains('league-checkbox')) {
-        handleFilterChange();
-      }
+    /* Top Filter Buttons */
+    document.getElementById('btn-select-all').addEventListener('click', () => {
+      setActiveFilterButton('btn-select-all');
+      updateMapFilters();
+    });
+    document.getElementById('btn-big-4').addEventListener('click', () => {
+      setActiveFilterButton('btn-big-4');
+      updateMapFilters();
+    });
+    document.getElementById('btn-select-none').addEventListener('click', () => {
+      setActiveFilterButton('btn-select-none');
+      updateMapFilters();
     });
 
-    document.addEventListener('click', function(e) {
-      if (!e.target) return;
-      if (e.target.id === 'btn-select-all') {
-        document.querySelectorAll('.league-checkbox').forEach(cb => cb.checked = true);
-        handleFilterChange();
-      } else if (e.target.id === 'btn-big-four') {
-        const bigFour = new Set(['NFL', 'MLB', 'NBA', 'NHL']);
-        document.querySelectorAll('.league-checkbox').forEach(cb => { cb.checked = bigFour.has(cb.value); });
-        handleFilterChange();
-      } else if (e.target.id === 'btn-select-none') {
-        document.querySelectorAll('.league-checkbox').forEach(cb => cb.checked = false);
-        handleFilterChange();
-      } else if (e.target.id === 'btn-reset-view') {
-        resetToDefaultView();
-      }
+    /* Initialize initial active button state color */
+    const initialActiveBtn = document.getElementById('btn-select-all');
+    initialActiveBtn.style.background = '#0284c7';
+    initialActiveBtn.style.borderColor = '#0369a1';
+
+    /* Navigation Listeners */
+    document.getElementById('back-to-conf-btn').addEventListener('click', () => {
+      map.setView([39.8283, -98.5795], getNationalZoom());
+      resetRightPanel();
     });
 
-    // Zoom back out to metro area when clicking anywhere on the open map away from a venue
-    map.on('click', () => {
-      if (activeVenueKey && lastZoomedMetro) {
-        activeVenueKey = null;
-        zoomToMetroArea(lastZoomedMetro);
+    document.getElementById('prev-venue-btn').addEventListener('click', () => {
+      if (currentFilteredVenues.length === 0) return;
+      if (currentVenueIndex === -1) {
+        currentVenueIndex = currentFilteredVenues.length - 1;
+      } else {
+        currentVenueIndex = (currentVenueIndex - 1 + currentFilteredVenues.length) % currentFilteredVenues.length;
       }
+      const v = currentFilteredVenues[currentVenueIndex];
+      map.flyTo(v.coords, 15, { duration: 0.8 });
+      if (markersMap[v.team]) markersMap[v.team].openPopup();
+      showVenueDetails(v, currentVenueIndex);
     });
 
-    map.on('zoomend', updateMap);
-    loadGoogleSheetData();
+    document.getElementById('next-venue-btn').addEventListener('click', () => {
+      if (currentFilteredVenues.length === 0) return;
+      if (currentVenueIndex === -1) {
+        currentVenueIndex = 0;
+      } else {
+        currentVenueIndex = (currentVenueIndex + 1) % currentFilteredVenues.length;
+      }
+      const v = currentFilteredVenues[currentVenueIndex];
+      map.flyTo(v.coords, 15, { duration: 0.8 });
+      if (markersMap[v.team]) markersMap[v.team].openPopup();
+      showVenueDetails(v, currentVenueIndex);
+    });
+
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=responseHandler:handleGvizResponse`;
+    const script = document.createElement('script');
+    script.src = gvizUrl;
+    document.body.appendChild(script);
+
+    map.on('zoomend', updateBasemapForZoom);
   </script>
 </body>
 </html>
