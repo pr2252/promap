@@ -467,20 +467,22 @@
     async function fetchWikiImage(wikiUrl, venueName) {
       let titles = [];
       if (wikiUrl && wikiUrl.includes('/wiki/')) {
-        let slug = wikiUrl.split('/wiki/')[1];
+        let slug = wikiUrl.split('/wiki/')[1].split('#')[0].split('?')[0];
         titles.push(slug);
       }
       titles.push(encodeURIComponent(venueName));
 
       for (let t of titles) {
-        const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=600&titles=${t}&origin=*`;
+        const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=600&redirects=1&titles=${t}&origin=*`;
         try {
           const response = await fetch(apiUrl);
           const data = await response.json();
-          const pages = data.query.pages;
-          for (let id in pages) {
-            if (pages[id].thumbnail && pages[id].thumbnail.source) {
-              return pages[id].thumbnail.source;
+          if (data.query && data.query.pages) {
+            const pages = data.query.pages;
+            for (let id in pages) {
+              if (pages[id].thumbnail && pages[id].thumbnail.source) {
+                return pages[id].thumbnail.source;
+              }
             }
           }
         } catch (e) {
