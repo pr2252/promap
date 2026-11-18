@@ -446,18 +446,6 @@
       setTimeout(() => { map.invalidateSize(); }, 100);
     }
 
-    function refreshTooltips() {
-      const isMetroActive = activeFilterKey && activeFilterKey.startsWith("metro:");
-      Object.keys(markersMap).forEach(teamName => {
-        const marker = markersMap[teamName];
-        const shouldBePermanent = isMetroActive || (selectedTeamName === teamName);
-        if (marker.getTooltip()) {
-          marker.unbindTooltip();
-        }
-      });
-      updateMapFilters();
-    }
-
     function resetRightPanel() {
       currentVenueIndex = -1;
       selectedTeamName = null;
@@ -771,19 +759,7 @@
         }
       });
 
-      // Group filtered venues by exact coordinates to detect overlapping/shared venues
-      const coordMap = {};
       currentFilteredVenues.forEach(v => {
-        const key = `${v.coords[0].toFixed(4)},${v.coords[1].toFixed(4)}`;
-        if (!coordMap[key]) coordMap[key] = [];
-        coordMap[key].push(v);
-      });
-
-      currentFilteredVenues.forEach(v => {
-        const key = `${v.coords[0].toFixed(4)},${v.coords[1].toFixed(4)}`;
-        const sameCoordTeams = coordMap[key];
-        const overlapIndex = sameCoordTeams.findIndex(item => item.team === v.team);
-
         const color = LEAGUE_COLORS[v.league] || "#475569";
         const marker = L.circleMarker(v.coords, {
           radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
@@ -795,29 +771,14 @@
           showVenueDetails(v, globalIdx);
         });
 
-        // Smart vertical offset for shared venues/co-located teams
-        let direction = 'top';
-        let offsetX = 0;
-        let offsetY = -8;
-
-        if (overlapIndex > 0) {
-          if (overlapIndex % 2 === 1) {
-            direction = 'bottom';
-            offsetY = 10 + (Math.floor(overlapIndex / 2) * 20);
-          } else {
-            direction = 'top';
-            offsetY = -8 - (overlapIndex * 22);
-          }
-        }
-
-        const isMetroActive = activeFilterKey && activeFilterKey.startsWith("metro:");
-        const shouldBePermanent = isMetroActive || (selectedTeamName === v.team);
+        // Permanent label ONLY for the explicitly selected/inspected team; hover tooltips for all others
+        const isSelected = (selectedTeamName === v.team);
 
         marker.bindTooltip(`<b>${v.team}</b>`, {
-          permanent: shouldBePermanent,
-          direction: direction,
+          permanent: isSelected,
+          direction: 'top',
           className: 'venue-tooltip',
-          offset: [offsetX, offsetY]
+          offset: [0, -8]
         });
         markersMap[v.team] = marker;
       });
