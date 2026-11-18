@@ -402,8 +402,7 @@
     };
 
     const BIG_4 = new Set(["NFL", "MLB", "NBA", "NHL"]);
-    const BIG_4_ORDER = ["NFL", "MLB", "NBA", "NHL"];
-    const OTHER_LEAGUES_ORDER = ["MLS", "NWSL", "WNBA"];
+    const ALL_LEAGUES_ORDER = ["NFL", "MLB", "NBA", "NHL", "MLS", "NWSL", "WNBA"];
 
     const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, noWrap: true });
     const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, noWrap: true });
@@ -418,6 +417,7 @@
     let currentVenueIndex = -1;
     let markersMap = {}; 
     let activeFilterKey = null; // Can be league name or "metro:MetroName"
+    let selectedTeamName = null; // Tracks single selected team for permanent tooltip
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -448,6 +448,8 @@
 
     function resetRightPanel() {
       currentVenueIndex = -1;
+      selectedTeamName = null;
+      updateMapFilters();
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = `
         <div class="venue-photo-container">
@@ -498,6 +500,9 @@
       } else {
         currentVenueIndex = currentFilteredVenues.findIndex(item => item.team === v.team);
       }
+
+      selectedTeamName = v.team;
+      updateMapFilters();
 
       const color = LEAGUE_COLORS[v.league] || "#475569";
       const capacityStr = v.capacity ? Number(v.capacity).toLocaleString() : 'N/A';
@@ -553,88 +558,80 @@
       const container = document.getElementById('sidebar-tree');
       container.innerHTML = '';
 
-      function renderLeagueGroup(title, leagueNames) {
-        const heading = document.createElement('div');
-        heading.className = 'section-heading';
-        heading.textContent = title;
-        container.appendChild(heading);
+      // Single Leagues Section in specified order
+      const heading = document.createElement('div');
+      heading.className = 'section-heading';
+      heading.textContent = "Leagues";
+      container.appendChild(heading);
 
-        leagueNames.forEach(league => {
-          if (!leagueGrouped[league]) return;
-          const teams = leagueGrouped[league].sort((a, b) => a.team.localeCompare(b.team));
-          const color = LEAGUE_COLORS[league] || "#475569";
+      ALL_LEAGUES_ORDER.forEach(league => {
+        if (!leagueGrouped[league]) return;
+        const teams = leagueGrouped[league].sort((a, b) => a.team.localeCompare(b.team));
+        const color = LEAGUE_COLORS[league] || "#475569";
 
-          const groupDiv = document.createElement('div');
-          groupDiv.className = 'conf-group';
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'conf-group';
 
-          const summaryDiv = document.createElement('div');
-          summaryDiv.className = 'conf-summary';
-          summaryDiv.innerHTML = `
-            <div class="conf-info-left">
-              <span class="conf-swatch" style="background:${color};"></span>
-              <span><b>${league}</b> (${teams.length})</span>
-            </div>
-            <span class="conf-toggle-arrow">▼</span>
-          `;
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'conf-summary';
+        summaryDiv.innerHTML = `
+          <div class="conf-info-left">
+            <span class="conf-swatch" style="background:${color};"></span>
+            <span><b>${league}</b> (${teams.length})</span>
+          </div>
+          <span class="conf-toggle-arrow">▼</span>
+        `;
 
-          const listDiv = document.createElement('div');
-          listDiv.className = 'school-list';
-          listDiv.style.display = 'none';
+        const listDiv = document.createElement('div');
+        listDiv.className = 'school-list';
+        listDiv.style.display = 'none';
 
-          summaryDiv.addEventListener('click', () => {
-            const isHidden = listDiv.style.display === 'none';
+        summaryDiv.addEventListener('click', () => {
+          const isHidden = listDiv.style.display === 'none';
 
-            document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+          document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+          document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
 
-            if (isHidden) {
-              listDiv.style.display = 'flex';
-              summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-              activeFilterKey = league;
-            } else {
-              activeFilterKey = null;
-            }
+          if (isHidden) {
+            listDiv.style.display = 'flex';
+            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
+            activeFilterKey = league;
+          } else {
+            activeFilterKey = null;
+          }
 
-            ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
-              const btn = document.getElementById(id);
-              if (btn) btn.style.background = '#334155';
-            });
+          selectedTeamName = null;
 
-            updateMapFilters();
-            map.setView([39.8283, -98.5795], getNationalZoom());
-            resetRightPanel();
+          ['btn-select-all', 'btn-big-4', 'btn-select-none'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.background = '#334155';
           });
 
-          teams.forEach(v => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'school-item';
-            itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
-            itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
-
-            itemDiv.addEventListener('click', (e) => {
-              e.stopPropagation();
-              const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
-              map.flyTo(v.coords, 15, { duration: 0.8 });
-              if (markersMap[v.team]) {
-                markersMap[v.team].openPopup();
-              }
-              showVenueDetails(v, globalIdx);
-            });
-
-            listDiv.appendChild(itemDiv);
-          });
-
-          groupDiv.appendChild(summaryDiv);
-          groupDiv.appendChild(listDiv);
-          container.appendChild(groupDiv);
+          updateMapFilters();
+          map.setView([39.8283, -98.5795], getNationalZoom());
+          resetRightPanel();
         });
-      }
 
-      const availableBig4 = BIG_4_ORDER.filter(l => leagueGrouped[l]);
-      const availableOthers = OTHER_LEAGUES_ORDER.filter(l => leagueGrouped[l]);
+        teams.forEach(v => {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'school-item';
+          itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
+          itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
 
-      renderLeagueGroup("Big 4 Leagues", availableBig4);
-      renderLeagueGroup("Other Leagues", availableOthers);
+          itemDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+            map.flyTo(v.coords, 15, { duration: 0.8 });
+            showVenueDetails(v, globalIdx);
+          });
+
+          listDiv.appendChild(itemDiv);
+        });
+
+        groupDiv.appendChild(summaryDiv);
+        groupDiv.appendChild(listDiv);
+        container.appendChild(groupDiv);
+      });
 
       // Metro Areas Section
       const metroHeading = document.createElement('div');
@@ -673,6 +670,8 @@
 
           document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
           document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+
+          selectedTeamName = null;
 
           if (isHidden) {
             listDiv.style.display = 'flex';
@@ -716,9 +715,6 @@
             e.stopPropagation();
             const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
             map.flyTo(v.coords, 15, { duration: 0.8 });
-            if (markersMap[v.team]) {
-              markersMap[v.team].openPopup();
-            }
             showVenueDetails(v, globalIdx);
           });
 
@@ -760,20 +756,31 @@
 
         if (show) {
           currentFilteredVenues.push(v);
-          const color = LEAGUE_COLORS[v.league] || "#475569";
-          const marker = L.circleMarker(v.coords, {
-            radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
-          }).addTo(venueLayer);
-
-          marker.on('click', () => {
-            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
-            map.flyTo(v.coords, 15, { duration: 0.8 });
-            showVenueDetails(v, globalIdx);
-          });
-
-          marker.bindTooltip(`<b>${v.team}</b>`, { direction: 'top', className: 'venue-tooltip', offset: [0, -8] });
-          markersMap[v.team] = marker;
         }
+      });
+
+      currentFilteredVenues.forEach(v => {
+        const color = LEAGUE_COLORS[v.league] || "#475569";
+        const marker = L.circleMarker(v.coords, {
+          radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
+        }).addTo(venueLayer);
+
+        marker.on('click', () => {
+          const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+          map.flyTo(v.coords, 15, { duration: 0.8 });
+          showVenueDetails(v, globalIdx);
+        });
+
+        // Permanent label ONLY for the explicitly selected/inspected team; hover tooltips for all others
+        const isSelected = (selectedTeamName === v.team);
+
+        marker.bindTooltip(`<b>${v.team}</b>`, {
+          permanent: isSelected,
+          direction: 'top',
+          className: 'venue-tooltip',
+          offset: [0, -8]
+        });
+        markersMap[v.team] = marker;
       });
 
       document.getElementById('active-count').textContent = `${currentFilteredVenues.length} of ${venues.length} teams shown`;
@@ -793,6 +800,7 @@
       activeBtn.style.borderColor = '#0369a1';
 
       activeFilterKey = null;
+      selectedTeamName = null;
       document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
       map.setView([39.8283, -98.5795], getNationalZoom());
@@ -885,7 +893,6 @@
       }
       const v = currentFilteredVenues[currentVenueIndex];
       map.flyTo(v.coords, 15, { duration: 0.8 });
-      if (markersMap[v.team]) markersMap[v.team].openPopup();
       showVenueDetails(v, currentVenueIndex);
     });
 
@@ -898,7 +905,6 @@
       }
       const v = currentFilteredVenues[currentVenueIndex];
       map.flyTo(v.coords, 15, { duration: 0.8 });
-      if (markersMap[v.team]) markersMap[v.team].openPopup();
       showVenueDetails(v, currentVenueIndex);
     });
 
