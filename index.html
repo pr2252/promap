@@ -454,19 +454,14 @@
         if (marker.getTooltip()) {
           marker.unbindTooltip();
         }
-        marker.bindTooltip(`<b>${teamName}</b>`, {
-          permanent: shouldBePermanent,
-          direction: 'top',
-          className: 'venue-tooltip',
-          offset: [0, -8]
-        });
       });
+      updateMapFilters();
     }
 
     function resetRightPanel() {
       currentVenueIndex = -1;
       selectedTeamName = null;
-      refreshTooltips();
+      updateMapFilters();
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = `
         <div class="venue-photo-container">
@@ -519,7 +514,7 @@
       }
 
       selectedTeamName = v.team;
-      refreshTooltips();
+      updateMapFilters();
 
       const color = LEAGUE_COLORS[v.league] || "#475569";
       const capacityStr = v.capacity ? Number(v.capacity).toLocaleString() : 'N/A';
@@ -751,12 +746,10 @@
       markersMap = {};
       currentFilteredVenues = [];
 
-      const isMetroActive = activeFilterKey && activeFilterKey.startsWith("metro:");
-
       venues.forEach(v => {
         let show = false;
         if (activeFilterKey) {
-          if (isMetroActive) {
+          if (activeFilterKey.startsWith("metro:")) {
             const targetMetro = activeFilterKey.substring(6);
             show = (v.metro === targetMetro);
           } else {
@@ -775,26 +768,58 @@
 
         if (show) {
           currentFilteredVenues.push(v);
-          const color = LEAGUE_COLORS[v.league] || "#475569";
-          const marker = L.circleMarker(v.coords, {
-            radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
-          }).addTo(venueLayer);
-
-          marker.on('click', () => {
-            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
-            map.flyTo(v.coords, 15, { duration: 0.8 });
-            showVenueDetails(v, globalIdx);
-          });
-
-          const shouldBePermanent = isMetroActive || (selectedTeamName === v.team);
-          marker.bindTooltip(`<b>${v.team}</b>`, {
-            permanent: shouldBePermanent,
-            direction: 'top',
-            className: 'venue-tooltip',
-            offset: [0, -8]
-          });
-          markersMap[v.team] = marker;
         }
+      });
+
+      // Group filtered venues by exact coordinates to detect overlapping/shared venues
+      const coordMap = {};
+      currentFilteredVenues.forEach(v => {
+        const key = `${v.coords[0].toFixed(4)},${v.coords[1].toFixed(4)}`;
+        if (!coordMap[key]) coordMap[key] = [];
+        coordMap[key].push(v);
+      });
+
+      currentFilteredVenues.forEach(v => {
+        const key = `${v.coords[0].toFixed(4)},${v.coords[1].toFixed(4)}`;
+        const sameCoordTeams = coordMap[key];
+        const overlapIndex = sameCoordTeams.findIndex(item => item.team === v.team);
+
+        const color = LEAGUE_COLORS[v.league] || "#475569";
+        const marker = L.circleMarker(v.coords, {
+          radius: 6.5, fillColor: color, color: "#ffffff", weight: 1.5, opacity: 1, fillOpacity: 0.95
+        }).addTo(venueLayer);
+
+        marker.on('click', () => {
+          const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
+          map.flyTo(v.coords, 15, { duration: 0.8 });
+          showVenueDetails(v, globalIdx);
+        });
+
+        // Smart vertical offset for shared venues/co-located teams
+        let direction = 'top';
+        let offsetX = 0;
+        let offsetY = -8;
+
+        if (overlapIndex > 0) {
+          if (overlapIndex % 2 === 1) {
+            direction = 'bottom';
+            offsetY = 10 + (Math.floor(overlapIndex / 2) * 20);
+          } else {
+            direction = 'top';
+            offsetY = -8 - (overlapIndex * 22);
+          }
+        }
+
+        const isMetroActive = activeFilterKey && activeFilterKey.startsWith("metro:");
+        const shouldBePermanent = isMetroActive || (selectedTeamName === v.team);
+
+        marker.bindTooltip(`<b>${v.team}</b>`, {
+          permanent: shouldBePermanent,
+          direction: direction,
+          className: 'venue-tooltip',
+          offset: [offsetX, offsetY]
+        });
+        markersMap[v.team] = marker;
       });
 
       document.getElementById('active-count').textContent = `${currentFilteredVenues.length} of ${venues.length} teams shown`;
