@@ -529,6 +529,8 @@
       applyTodayScheduleToVenues();
       updateMapFilters();
     }
+    const BIG_4_ORDER = ["NFL", "MLB", "NBA", "NHL"];
+    const OTHER_LEAGUES_ORDER = ["MLS", "NWSL", "WNBA"];
 
     const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, noWrap: true });
     const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, noWrap: true });
@@ -543,6 +545,7 @@
     let currentVenueIndex = -1;
     let markersMap = {}; 
     let activeFilterKey = null; // Can be league name or "metro:MetroName"
+    let todayOnlyMode = false; // Keeps Today active while narrowing by league or metro
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -722,7 +725,12 @@
 
           ['btn-select-all', 'btn-big-4', 'btn-today'].forEach(id => {
             const btn = document.getElementById(id);
-            if (btn) {
+            if (!btn) return;
+            if (id === 'btn-today' && todayOnlyMode) {
+              btn.classList.add('active');
+              btn.style.background = '#0284c7';
+              btn.style.borderColor = '#0369a1';
+            } else {
               btn.classList.remove('active');
               btn.style.background = '#334155';
               btn.style.borderColor = '#475569';
@@ -764,6 +772,7 @@
       metroHeading.textContent = "Metro Areas";
       container.appendChild(metroHeading);
 
+      // Sort metros by total number of teams descending, then alphabetically by name
       const sortedMetros = Object.keys(metroGrouped).sort((a, b) => {
         const countDiff = metroGrouped[b].length - metroGrouped[a].length;
         if (countDiff !== 0) return countDiff;
@@ -800,6 +809,7 @@
             summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
             activeFilterKey = "metro:" + metro;
 
+            // Compute bounding box or center for metro teams to zoom in
             let lats = teams.map(t => t.coords[0]);
             let lngs = teams.map(t => t.coords[1]);
             let minLat = Math.min(...lats), maxLat = Math.max(...lats);
@@ -819,7 +829,12 @@
 
           ['btn-select-all', 'btn-big-4', 'btn-today'].forEach(id => {
             const btn = document.getElementById(id);
-            if (btn) {
+            if (!btn) return;
+            if (id === 'btn-today' && todayOnlyMode) {
+              btn.classList.add('active');
+              btn.style.background = '#0284c7';
+              btn.style.borderColor = '#0369a1';
+            } else {
               btn.classList.remove('active');
               btn.style.background = '#334155';
               btn.style.borderColor = '#475569';
@@ -862,6 +877,11 @@
       markersMap = {};
       currentFilteredVenues = [];
 
+      const btnAll = document.getElementById('btn-select-all');
+      const btnBig4 = document.getElementById('btn-big-4');
+      const btnToday = document.getElementById('btn-today');
+      const todayActive = todayOnlyMode || (btnToday && btnToday.classList.contains('active'));
+
       venues.forEach(v => {
         let show = false;
         if (activeFilterKey) {
@@ -871,15 +891,15 @@
           } else {
             show = (v.league === activeFilterKey);
           }
+          if (todayActive) show = show && Boolean(v.isPlayingToday);
+        } else if (todayActive) {
+          show = Boolean(v.isPlayingToday);
+        } else if (btnBig4 && btnBig4.classList.contains('active')) {
+          show = BIG_4.has(v.league);
+        } else if (btnAll && btnAll.classList.contains('active')) {
+          show = true;
         } else {
-          const btnAll = document.getElementById('btn-select-all');
-          const btnBig4 = document.getElementById('btn-big-4');
-          const btnToday = document.getElementById('btn-today');
-
-          if (btnToday && btnToday.classList.contains('active')) show = Boolean(v.isPlayingToday);
-          else if (btnBig4 && btnBig4.classList.contains('active')) show = BIG_4.has(v.league);
-          else if (btnAll && btnAll.classList.contains('active')) show = true;
-          else show = true;
+          show = true;
         }
 
         if (show) {
@@ -907,6 +927,7 @@
     }
 
     function setActiveFilterButton(btnId) {
+      todayOnlyMode = (btnId === 'btn-today');
       ['btn-select-all', 'btn-big-4', 'btn-today'].forEach(id => {
         const btn = document.getElementById(id);
         if (!btn) return;
