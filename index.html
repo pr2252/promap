@@ -354,6 +354,12 @@
           <button class="btn-action" id="btn-big-4" style="background:#334155; border-color:#475569; color:#fff;">Big 4</button>
           <button class="btn-action" id="btn-today" style="background:#334155; border-color:#475569; color:#fff;">Today</button>
         </div>
+        <div style="display: flex; gap: 4px; width: 100%; align-items: center;">
+          <input type="date" id="date-start" title="Start date" style="flex:1; min-width:0; background:#334155; color:#fff; border:1px solid #475569; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600; color-scheme:dark;">
+          <span style="font-size:10px; opacity:0.75;">to</span>
+          <input type="date" id="date-end" title="End date (optional)" style="flex:1; min-width:0; background:#334155; color:#fff; border:1px solid #475569; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600; color-scheme:dark;">
+          <button class="btn-action" id="btn-apply-dates" style="flex:0 0 auto; padding:3px 8px; background:#334155; border-color:#475569; color:#fff;">Go</button>
+        </div>
       </div>
       <div class="sidebar-content" id="sidebar-tree"></div>
     </div>
@@ -414,15 +420,38 @@
       "WNBA": "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard"
     };
 
-    let todayPlayingTeams = new Set();
-    let todayScheduleLoaded = false;
+    let scheduleLoaded = false;
+    let activeDateRangeLabel = 'Today';
+    const MAX_RANGE_DAYS = 14;
 
-    function getLocalDateYMD() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      return `${y}${m}${d}`;
+    function formatIsoLocalDate(dt) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      const d = String(dt.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    function getLocalDateYMD(isoStr) {
+      if (isoStr) return isoStr.replace(/-/g, '');
+      return formatIsoLocalDate(new Date()).replace(/-/g, '');
+    }
+
+    function enumerateDatesYMD(startIso, endIso) {
+      const startStr = startIso || formatIsoLocalDate(new Date());
+      const endStr = endIso || startStr;
+      const [sy, sm, sd] = startStr.split('-').map(Number);
+      const [ey, em, ed] = endStr.split('-').map(Number);
+      let cur = new Date(sy, sm - 1, sd);
+      let end = new Date(ey, em - 1, ed);
+      if (isNaN(cur.getTime()) || isNaN(end.getTime())) return [getLocalDateYMD()];
+      if (end < cur) { const tmp = cur; cur = end; end = tmp; }
+
+      const dates = [];
+      for (let i = 0; i < MAX_RANGE_DAYS && cur <= end; i++) {
+        dates.push(getLocalDateYMD(formatIsoLocalDate(cur)));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
     }
 
     function normalizeTeamKey(str) {
@@ -441,11 +470,17 @@
       return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     }
 
-    function applyTodayScheduleToVenues() {
+    function formatShortDay(ymdStr) {
+      if (!ymdStr || ymdStr.length !== 8) return ymdStr;
+      const dt = new Date(Number(ymdStr.slice(0, 4)), Number(ymdStr.slice(4, 6)) - 1, Number(ymdStr.slice(6, 8)));
+      return dt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    function applyScheduleToVenues() {
       if (!venues.length) return;
       venues.forEach(v => {
-        v.isPlayingToday = false;
-        v.todayMatchup = '';
+        v.isPlayingInWindow = false;
+        v.windowGames = [];
       });
 
       if (!window._espnGamesByLeague) return;
@@ -454,6 +489,7 @@
         const games = window._espnGamesByLeague[v.league] || [];
         const vNorm = normalizeTeamKey(v.team);
         const vLower = v.team.toLowerCase().trim();
+        const seen = new Set();
 
         for (const g of games) {
           const hNorm = normalizeTeamKey(g.homeName);
@@ -468,65 +504,69 @@
             (vNorm && (vNorm === hNorm || vNorm === hDisplayNorm || vNorm === hShortNorm));
 
           if (matched) {
-            v.isPlayingToday = true;
-            const timePart = g.gameTime ? ` (${g.gameTime})` : '';
+            v.isPlayingInWindow = true;
+            const dayPart = g.ymd ? `${formatShortDay(g.ymd)} ` : '';
+            const timePart = g.gameTime ? ` ${g.gameTime}` : '';
             const statusPart = g.statusDetail && g.statusDetail !== 'Scheduled' ? ` • ${g.statusDetail}` : '';
-            v.todayMatchup = `${g.awayShortName || g.awayDisplayName} @ ${g.homeShortName || g.homeDisplayName}${timePart}${statusPart}`;
-            break;
+            const line = `${dayPart}${g.awayShortName || g.awayDisplayName} @ ${g.homeShortName || g.homeDisplayName}${timePart}${statusPart}`;
+            if (!seen.has(line)) {
+              seen.add(line);
+              v.windowGames.push(line);
+            }
           }
         }
       });
-
-      todayPlayingTeams = new Set(venues.filter(v => v.isPlayingToday).map(v => v.team));
     }
 
-    async function fetchTodayScoreboards() {
-      const ymd = getLocalDateYMD();
+    async function fetchScoreboardsForRange(startIso, endIso, label = 'Today') {
+      const ymdList = enumerateDatesYMD(startIso, endIso);
       const results = {};
+      ALL_LEAGUES_ORDER.forEach(l => { results[l] = []; });
 
       await Promise.all(
-        ALL_LEAGUES_ORDER.map(async (league) => {
+        ALL_LEAGUES_ORDER.flatMap(league => {
           const baseUrl = ESPN_SCOREBOARD_URLS[league];
-          if (!baseUrl) return;
-          try {
-            const resp = await fetch(`${baseUrl}?dates=${ymd}`);
-            if (!resp.ok) return;
-            const data = await resp.json();
-            const events = Array.isArray(data.events) ? data.events : [];
-            const parsedGames = [];
+          if (!baseUrl) return [];
+          return ymdList.map(async (ymd) => {
+            try {
+              const resp = await fetch(`${baseUrl}?dates=${ymd}`);
+              if (!resp.ok) return;
+              const data = await resp.json();
+              const events = Array.isArray(data.events) ? data.events : [];
 
-            events.forEach(ev => {
-              const comp = ev.competitions && ev.competitions[0];
-              const competitors = (comp && comp.competitors) || [];
-              const home = competitors.find(c => c.homeAway === 'home');
-              const away = competitors.find(c => c.homeAway === 'away');
-              if (!home || !away) return;
+              events.forEach(ev => {
+                const comp = ev.competitions && ev.competitions[0];
+                const competitors = (comp && comp.competitors) || [];
+                const home = competitors.find(c => c.homeAway === 'home');
+                const away = competitors.find(c => c.homeAway === 'away');
+                if (!home || !away) return;
 
-              const homeTeam = home.team || {};
-              const awayTeam = away.team || {};
-              const statusDetail = (ev.status && ev.status.type && ev.status.type.shortDetail) || '';
+                const homeTeam = home.team || {};
+                const awayTeam = away.team || {};
+                const statusDetail = (ev.status && ev.status.type && ev.status.type.shortDetail) || '';
 
-              parsedGames.push({
-                homeName: homeTeam.name || '',
-                homeDisplayName: homeTeam.displayName || homeTeam.name || '',
-                homeShortName: homeTeam.shortDisplayName || homeTeam.name || '',
-                awayDisplayName: awayTeam.displayName || awayTeam.name || '',
-                awayShortName: awayTeam.shortDisplayName || awayTeam.name || '',
-                gameTime: formatGameTime(ev.date),
-                statusDetail
+                results[league].push({
+                  ymd,
+                  homeName: homeTeam.name || '',
+                  homeDisplayName: homeTeam.displayName || homeTeam.name || '',
+                  homeShortName: homeTeam.shortDisplayName || homeTeam.name || '',
+                  awayDisplayName: awayTeam.displayName || awayTeam.name || '',
+                  awayShortName: awayTeam.shortDisplayName || awayTeam.name || '',
+                  gameTime: formatGameTime(ev.date),
+                  statusDetail
+                });
               });
-            });
-
-            results[league] = parsedGames;
-          } catch (err) {
-            results[league] = [];
-          }
+            } catch (err) {
+              // Ignore failed date/league request
+            }
+          });
         })
       );
 
       window._espnGamesByLeague = results;
-      todayScheduleLoaded = true;
-      applyTodayScheduleToVenues();
+      activeDateRangeLabel = label;
+      scheduleLoaded = true;
+      applyScheduleToVenues();
       updateMapFilters();
     }
     const BIG_4_ORDER = ["NFL", "MLB", "NBA", "NHL"];
@@ -652,7 +692,7 @@
           </div>
         </div>
         <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-btn">View on Wikipedia &rarr;</a>
-        ${v.todayMatchup ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>Today's Game:</b> ${v.todayMatchup}</div>` : ''}
+        ${(v.windowGames && v.windowGames.length) ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Scheduled Games'}:</b><br>${v.windowGames.join('<br>')}</div>` : ''}
         ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
       `;
 
@@ -891,9 +931,9 @@
           } else {
             show = (v.league === activeFilterKey);
           }
-          if (todayActive) show = show && Boolean(v.isPlayingToday);
+          if (todayActive) show = show && Boolean(v.isPlayingInWindow);
         } else if (todayActive) {
-          show = Boolean(v.isPlayingToday);
+          show = Boolean(v.isPlayingInWindow);
         } else if (btnBig4 && btnBig4.classList.contains('active')) {
           show = BIG_4.has(v.league);
         } else if (btnAll && btnAll.classList.contains('active')) {
@@ -997,8 +1037,8 @@
       });
 
       renderSidebarTree(leagueGrouped, metroGrouped);
-      if (todayScheduleLoaded) {
-        applyTodayScheduleToVenues();
+      if (scheduleLoaded) {
+        applyScheduleToVenues();
         updateMapFilters();
       }
     };
@@ -1013,17 +1053,28 @@
       updateMapFilters();
     });
     document.getElementById('btn-today').addEventListener('click', async () => {
+      const todayIso = formatIsoLocalDate(new Date());
+      document.getElementById('date-start').value = todayIso;
+      document.getElementById('date-end').value = '';
       setActiveFilterButton('btn-today');
-      if (!todayScheduleLoaded) {
-        document.getElementById('active-count').textContent = "Checking today's games...";
-        await fetchTodayScoreboards();
-      } else {
-        applyTodayScheduleToVenues();
-        updateMapFilters();
-      }
+      document.getElementById('active-count').textContent = "Checking today's games...";
+      await fetchScoreboardsForRange(todayIso, todayIso, 'Today');
     });
 
-    fetchTodayScoreboards();
+    document.getElementById('btn-apply-dates').addEventListener('click', async () => {
+      const startVal = document.getElementById('date-start').value;
+      const endVal = document.getElementById('date-end').value || startVal;
+      if (!startVal) return;
+      const label = startVal === endVal ? startVal : `${startVal} to ${endVal}`;
+      todayOnlyMode = true;
+      setActiveFilterButton('btn-today');
+      document.getElementById('active-count').textContent = `Checking ${label}...`;
+      await fetchScoreboardsForRange(startVal, endVal, label);
+    });
+
+    const initialTodayIso = formatIsoLocalDate(new Date());
+    document.getElementById('date-start').value = initialTodayIso;
+    fetchScoreboardsForRange(initialTodayIso, initialTodayIso, 'Today');
 
     /* Initialize initial active button state color */
     const initialActiveBtn = document.getElementById('btn-select-all');
