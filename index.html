@@ -365,12 +365,20 @@
     }
     .game-feed-item {
       border: 1px solid #e2e8f0;
+      border-left-width: 4px;
       border-radius: 6px;
       padding: 6px 8px;
       background: #f8fafc;
       font-size: 10px;
       color: #334155;
       line-height: 1.35;
+    }
+    .game-league-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
     }
     .game-feed-team {
       font-weight: 800;
@@ -390,7 +398,7 @@
 <body>
 
   <div id="dashboard-wrapper">
-    <!-- Left Sidebar: Pro Sports -->
+    <!-- Left Sidebar: Pro Leagues -->
     <div id="sidebar">
       <div class="nav-bar-banner">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -430,12 +438,9 @@
       <div id="map"></div>
     </div>
 
-    <!-- Right Explorer Panel: Team & Venue Details -->
+    <!-- Right Explorer Panel -->
     <div id="explorer-panel">
       <div class="nav-bar-banner">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Team & Venue Details</span>
-        </div>
         <div style="display: flex; gap: 4px; width: 100%;">
           <button class="back-conf-btn" id="back-to-conf-btn">&larr; Back to Leagues</button>
           <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
@@ -590,6 +595,7 @@
                 league: v.league,
                 venue: v.venue,
                 line,
+                ymd: g.ymd || '',
                 isoDate: g.isoDate || ''
               });
             }
@@ -747,6 +753,12 @@
       setTimeout(() => { map.invalidateSize(); }, 100);
     }
 
+    function parseGameSortKey(entry) {
+      const ts = Date.parse(entry.isoDate || '');
+      if (!isNaN(ts)) return ts;
+      return Number((entry.ymd || '99999999') + '0000');
+    }
+
     function buildScheduledGamesFeedHtml() {
       const showFeed = dateWindowActive || (activeFilterKey && activeFilterKey.startsWith('metro:'));
       if (!showFeed) return '';
@@ -758,13 +770,19 @@
         }
       });
 
+      entries.sort((a, b) => {
+        const diff = parseGameSortKey(a) - parseGameSortKey(b);
+        if (diff !== 0) return diff;
+        return a.team.localeCompare(b.team);
+      });
+
       const headingText = activeFilterKey && activeFilterKey.startsWith('metro:')
         ? `Scheduled Games (${activeDateRangeLabel})`
         : `Scheduled Home Games (${activeDateRangeLabel})`;
 
       if (!entries.length) {
         return `
-          <div style="margin-top:4px;">
+          <div style="margin-top:2px;">
             <div class="section-heading" style="margin-left:0;">${headingText}</div>
             <div class="photo-placeholder" style="padding:8px 4px;">No scheduled home games found for the selected filter and dates.</div>
           </div>
@@ -773,10 +791,14 @@
 
       const itemsHtml = entries.map(e => {
         const safeTeam = e.team.replace(/'/g, "\\'");
+        const color = LEAGUE_COLORS[e.league] || "#475569";
         return `
-          <div class="game-feed-item">
-            <span class="game-feed-team" onclick="focusTeamFromScheduleFeed('${safeTeam}')">${e.team}</span>
-            <span style="font-size:9px; font-weight:700; color:#475569;"> (${e.league})</span>
+          <div class="game-feed-item" style="border-left-color:${color}; background:${color}10;">
+            <div style="display:flex; align-items:center; gap:5px;">
+              <span class="game-league-dot" style="background:${color};"></span>
+              <span class="game-feed-team" onclick="focusTeamFromScheduleFeed('${safeTeam}')">${e.team}</span>
+              <span style="font-size:9px; font-weight:700; color:#475569;"> (${e.league})</span>
+            </div>
             <div>${e.line}</div>
             <div class="game-feed-meta">${e.venue}</div>
           </div>
@@ -784,7 +806,7 @@
       }).join('');
 
       return `
-        <div style="margin-top:4px;">
+        <div style="margin-top:2px;">
           <div class="section-heading" style="margin-left:0;">${headingText} (${entries.length})</div>
           <div style="display:flex; flex-direction:column; gap:6px;">${itemsHtml}</div>
         </div>
@@ -803,16 +825,7 @@
     function resetRightPanel() {
       currentVenueIndex = -1;
       const panelContent = document.getElementById('panel-content');
-      panelContent.innerHTML = `
-        <div class="venue-photo-container">
-          <div class="photo-placeholder">Click any stadium marker on the map or team name in the sidebar to inspect details and Wikipedia photos.</div>
-        </div>
-        <div>
-          <h2 class="team-title">Select a Team</h2>
-          <div class="team-subtitle">Interactive Dashboard</div>
-        </div>
-        ${buildScheduledGamesFeedHtml()}
-      `;
+      panelContent.innerHTML = buildScheduledGamesFeedHtml();
       document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
       if (window.innerWidth <= 1100) {
         showMobilePanel('sidebar');
@@ -858,11 +871,12 @@
       const capacityStr = v.capacity ? Number(v.capacity).toLocaleString() : 'N/A';
       const wikiUrl = v.wikiUrl && v.wikiUrl.startsWith('http') ? v.wikiUrl : `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(v.venue + ' ' + v.team)}`;
 
+      const windowGameList = Array.isArray(v.windowGames) ? v.windowGames : [];
+      const uniqueWindowGames = windowGameList.filter(line => line !== v.nextHomeGame);
+
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = `
-        <div class="venue-photo-container" id="photo-box">
-          <div class="photo-placeholder">Loading Wikipedia photo...</div>
-        </div>
+        <div id="photo-slot"></div>
         <div>
           <span class="conf-badge-large" style="background:${color};">${v.league}</span>
           <h2 class="team-title">${v.team}</h2>
@@ -880,7 +894,7 @@
         </div>
         <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-btn">View on Wikipedia &rarr;</a>
         ${v.nextHomeGame ? `<div class="notes-box" style="background:#f0fdf4; border-color:#bbf7d0; color:#14532d;"><b>Next Home Game:</b> ${v.nextHomeGame}</div>` : ''}
-        ${(v.windowGames && v.windowGames.length) ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Selected Dates'}:</b><br>${v.windowGames.join('<br>')}</div>` : ''}
+        ${uniqueWindowGames.length ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Selected Dates'}:</b><br>${uniqueWindowGames.join('<br>')}</div>` : ''}
         ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
       `;
 
@@ -896,13 +910,9 @@
       }
 
       const imgUrl = await fetchWikiImage(v.wikiUrl, v.venue);
-      const photoBox = document.getElementById('photo-box');
-      if (photoBox) {
-        if (imgUrl) {
-          photoBox.innerHTML = `<img src="${imgUrl}" alt="${v.venue}">`;
-        } else {
-          photoBox.innerHTML = `<div class="photo-placeholder">No Wikipedia photo available</div>`;
-        }
+      const photoSlot = document.getElementById('photo-slot');
+      if (photoSlot && imgUrl) {
+        photoSlot.innerHTML = `<div class="venue-photo-container"><img src="${imgUrl}" alt="${v.venue}"></div>`;
       }
     }
 
