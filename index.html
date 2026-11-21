@@ -590,9 +590,7 @@
       <!-- Right Explorer Panel -->
       <div id="explorer-panel">
         <div class="panel-body" id="panel-content">
-          <div>
-            <h2 class="team-title">Select a Team or Venue for Details</h2>
-          </div>
+          <div class="photo-placeholder">Select a filter for Leagues or Upcoming Games to see more details.</div>
         </div>
         <div class="nav-bar-banner" id="detail-nav-bar" style="display: none;">
           <div style="display: flex; gap: 4px; width: 100%;">
@@ -1025,15 +1023,20 @@
       if (navEl) navEl.style.display = visible ? 'flex' : 'none';
     }
 
+    function renderEmptyDetailMessage() {
+      return '<div class="photo-placeholder">Select a filter for Leagues or Upcoming Games to see more details.</div>';
+    }
+
     function resetRightPanel() {
       currentVenueIndex = -1;
       setDetailNavVisible(false);
       const panelContent = document.getElementById('panel-content');
       if (!hasUserFiltered) {
-        panelContent.innerHTML = '';
+        panelContent.innerHTML = renderEmptyDetailMessage();
         return;
       }
-      panelContent.innerHTML = buildScheduledGamesFeedHtml();
+      const feedHtml = buildScheduledGamesFeedHtml();
+      panelContent.innerHTML = feedHtml && feedHtml.trim() ? feedHtml : renderEmptyDetailMessage();
     }
 
     async function fetchWikiImage(wikiUrl, venueName) {
@@ -1097,7 +1100,6 @@
             <div class="info-value">${capacityStr}</div>
           </div>
         </div>
-        <a href="${wikiUrl}" target="_blank" rel="noopener noreferrer" class="wiki-btn">View on Wikipedia &rarr;</a>
         ${v.nextHomeGame ? `<div class="notes-box" style="background:#f0fdf4; border-color:#bbf7d0; color:#14532d;"><b>Next Home Game:</b> ${v.nextHomeGame}</div>` : ''}
         ${uniqueWindowGames.length ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Selected Dates'}:</b><br>${uniqueWindowGames.join('<br>')}</div>` : ''}
         ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
