@@ -14,11 +14,25 @@
       background: #0f172a;
     }
 
-    #dashboard-wrapper {
+    #app-shell {
       display: flex;
+      flex-direction: column;
       width: 100vw;
       height: 100vh;
       height: 100dvh;
+    }
+
+    #top-header-bar {
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 1100;
+    }
+
+    #dashboard-wrapper {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
     }
 
     /* Left Sidebar Tree */
@@ -62,10 +76,14 @@
         overflow-y: auto;
         height: auto;
       }
+      #app-shell {
+        height: auto;
+        min-height: 100vh;
+      }
       #dashboard-wrapper {
         flex-direction: column;
         height: auto;
-        min-height: 100vh;
+        flex: none;
       }
 
       /* Map at top on mobile */
@@ -339,9 +357,10 @@
     #explorer-panel .nav-bar-banner {
       background: #f1f5f9;
       color: #0f172a;
-      border-bottom: 1px solid #cbd5e1;
+      border-top: 1px solid #cbd5e1;
       box-shadow: none;
       padding: 8px 12px;
+      margin-top: auto;
     }
     .back-conf-btn {
       background: #ffffff;
@@ -527,57 +546,60 @@
 </head>
 <body>
 
-  <div id="dashboard-wrapper">
-    <!-- Left Sidebar: Pro Leagues -->
-    <div id="sidebar">
-      <div class="nav-bar-banner">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Pro Sports</span>
-          <span id="active-count" style="font-size: 11px; font-weight: 600; opacity: 0.9;">Loading...</span>
-        </div>
-
-      </div>
-      <div class="sidebar-content" id="sidebar-tree-wrap" style="gap: 8px;">
-        <div class="filter-card-box" id="home-games-dropdown-group">
-          <div class="filter-card-header" id="home-games-dropdown-toggle">
-            <span>Games</span>
-            <span id="home-games-dropdown-arrow" style="font-size:9px; color:#64748b;">▼</span>
-          </div>
-          <div class="filter-card-body" id="home-games-dropdown-body" style="display:none; flex-direction:column; gap:6px;">
-            <div style="display:flex; gap:4px; width:100%;">
-              <button class="btn-action" id="btn-today" style="background:#334155; border-color:#475569; color:#fff;">Today</button>
-              <button class="btn-action" id="btn-next-3-days" style="background:#334155; border-color:#475569; color:#fff;">Next 3 Days</button>
-              <button class="btn-action" id="btn-reset-dates" style="background:#334155; border-color:#475569; color:#fff;">Reset</button>
-            </div>
-            <div style="display:flex; gap:4px; width:100%; align-items:center;">
-              <input type="date" id="date-start" title="Start date" style="flex:1; min-width:0; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600;">
-              <span style="font-size:10px; color:#64748b;">to</span>
-              <input type="date" id="date-end" title="End date (optional)" style="flex:1; min-width:0; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600;">
-              <button class="btn-action" id="btn-apply-dates" style="flex:0 0 auto; padding:3px 8px; background:#334155; border-color:#475569; color:#fff;">Go</button>
-            </div>
-          </div>
-        </div>
-        <div id="sidebar-tree" style="display:flex; flex-direction:column; gap:6px;"></div>
+  <div id="app-shell">
+    <div class="nav-bar-banner" id="top-header-bar">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Pro Sports</span>
+        <span id="active-count" style="font-size: 11px; font-weight: 600; opacity: 0.9;">Loading...</span>
       </div>
     </div>
 
-    <!-- Center Map -->
-    <div id="map-container">
-      <div id="map"></div>
-    </div>
-
-    <!-- Right Explorer Panel -->
-    <div id="explorer-panel">
-      <div class="nav-bar-banner" id="detail-nav-bar" style="display: none;">
-        <div style="display: flex; gap: 4px; width: 100%;">
-          <button class="back-conf-btn" id="back-to-conf-btn">&larr; Reset View</button>
-          <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
-          <button class="back-conf-btn" id="next-venue-btn">Next</button>
+    <div id="dashboard-wrapper">
+      <!-- Left Sidebar: Pro Leagues -->
+      <div id="sidebar">
+        <div class="sidebar-content" id="sidebar-tree-wrap" style="gap: 8px;">
+          <div id="leagues-slot" style="display:flex; flex-direction:column;"></div>
+          <div class="filter-card-box" id="home-games-dropdown-group">
+            <div class="filter-card-header" id="home-games-dropdown-toggle">
+              <span>Upcoming Games</span>
+              <span id="home-games-dropdown-arrow" style="font-size:9px; color:#64748b;">▼</span>
+            </div>
+            <div class="filter-card-body" id="home-games-dropdown-body" style="display:none; flex-direction:column; gap:6px;">
+              <div style="display:flex; gap:4px; width:100%;">
+                <button class="btn-action active" id="btn-reset-dates" style="background:#0284c7; border-color:#0369a1; color:#fff;">None</button>
+                <button class="btn-action" id="btn-today" style="background:#334155; border-color:#475569; color:#fff;">Today</button>
+                <button class="btn-action" id="btn-next-3-days" style="background:#334155; border-color:#475569; color:#fff;">Next 3 Days</button>
+              </div>
+              <div style="display:flex; gap:4px; width:100%; align-items:center;">
+                <input type="date" id="date-start" title="Start date" style="flex:1; min-width:0; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600;">
+                <span style="font-size:10px; color:#64748b;">to</span>
+                <input type="date" id="date-end" title="End date (optional)" style="flex:1; min-width:0; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600;">
+                <button class="btn-action" id="btn-apply-dates" style="flex:0 0 auto; padding:3px 8px; background:#334155; border-color:#475569; color:#fff;">Go</button>
+              </div>
+            </div>
+          </div>
+          <div id="sidebar-tree" style="display:flex; flex-direction:column; gap:6px;"></div>
         </div>
       </div>
-      <div class="panel-body" id="panel-content">
-        <div>
-          <h2 class="team-title">Select a Team or Venue for Details</h2>
+
+      <!-- Center Map -->
+      <div id="map-container">
+        <div id="map"></div>
+      </div>
+
+      <!-- Right Explorer Panel -->
+      <div id="explorer-panel">
+        <div class="panel-body" id="panel-content">
+          <div>
+            <h2 class="team-title">Select a Team or Venue for Details</h2>
+          </div>
+        </div>
+        <div class="nav-bar-banner" id="detail-nav-bar" style="display: none;">
+          <div style="display: flex; gap: 4px; width: 100%;">
+            <button class="back-conf-btn" id="back-to-conf-btn">&larr; Reset View</button>
+            <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
+            <button class="back-conf-btn" id="next-venue-btn">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -689,7 +711,9 @@
     function formatGameSummaryLine(g) {
       const dayPart = g.ymd ? `${formatShortDay(g.ymd)} ` : '';
       const timePart = g.gameTime ? ` ${g.gameTime}` : '';
-      const statusPart = g.statusDetail && g.statusDetail !== 'Scheduled' ? ` • ${g.statusDetail}` : '';
+      const rawStatus = (g.statusDetail || '').trim();
+      const isDateTimestamp = /\d{1,2}\/\d{1,2}|\b(AM|PM|EST|EDT|CST|CDT|MST|MDT|PST|PDT)\b/i.test(rawStatus);
+      const statusPart = rawStatus && rawStatus !== 'Scheduled' && !isDateTimestamp ? ` • ${rawStatus}` : '';
       return `${dayPart}${g.awayShortName || g.awayDisplayName} @ ${g.homeShortName || g.homeDisplayName}${timePart}${statusPart}`;
     }
 
@@ -855,7 +879,8 @@
     let selectedLeague = null; // e.g., 'NFL', 'MLB', or null
     let selectedMetro = null; // e.g., 'New York', or null
     let todayOnlyMode = false; // True when any date filter is active
-    let activeDatePreset = null; // 'today' | 'next3' | 'custom' | null
+    let activeDatePreset = 'none'; // 'none' | 'today' | 'next3' | 'custom'
+    let hasUserFiltered = false; // False on initial view so detail pane stays clean until a filter is clicked
     let leaguesSectionExpanded = true;
     let metrosSectionExpanded = false; // Collapsed on initial load
 
@@ -909,7 +934,7 @@
       }
 
       const itemsHtml = sortedVenues.map(v => {
-        const safeTeam = v.team.replace(/'/g, "\\'");
+        const safeTeam = v.team.replace(/'/g, "\'");
         const color = LEAGUE_COLORS[v.league] || "#475569";
         return `
           <div class="game-feed-item" style="border-left-color:${color}; background:${color}10;">
@@ -963,7 +988,7 @@
       }
 
       const itemsHtml = entries.map(e => {
-        const safeTeam = e.team.replace(/'/g, "\\'");
+        const safeTeam = e.team.replace(/'/g, "\'");
         const color = LEAGUE_COLORS[e.league] || "#475569";
         return `
           <div class="game-feed-item" style="border-left-color:${color}; background:${color}10;">
@@ -1004,6 +1029,10 @@
       currentVenueIndex = -1;
       setDetailNavVisible(false);
       const panelContent = document.getElementById('panel-content');
+      if (!hasUserFiltered) {
+        panelContent.innerHTML = '';
+        return;
+      }
       panelContent.innerHTML = buildScheduledGamesFeedHtml();
     }
 
@@ -1166,10 +1195,13 @@
         btn.classList.toggle('active', selectedMetro === metro);
       });
 
-      ['btn-today', 'btn-next-3-days'].forEach(id => {
+      ['btn-reset-dates', 'btn-today', 'btn-next-3-days'].forEach(id => {
         const btn = document.getElementById(id);
         if (!btn) return;
-        const isActive = (id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3');
+        const isActive =
+          (id === 'btn-reset-dates' && activeDatePreset === 'none') ||
+          (id === 'btn-today' && activeDatePreset === 'today') ||
+          (id === 'btn-next-3-days' && activeDatePreset === 'next3');
         btn.classList.toggle('active', isActive);
         btn.style.background = isActive ? '#0284c7' : '#334155';
         btn.style.borderColor = isActive ? '#0369a1' : '#475569';
@@ -1184,6 +1216,7 @@
       btn.innerHTML = `${league} <span class="league-count-label" data-league="${league}">(${count})</span>`;
 
       btn.addEventListener('click', () => {
+        hasUserFiltered = true;
         if (selectedLeague === league) {
           selectedLeague = null;
         } else {
@@ -1264,7 +1297,9 @@
       });
 
       leagueCard.appendChild(leaguesBodyDiv);
-      container.appendChild(leagueCard);
+      const leaguesSlot = document.getElementById('leagues-slot');
+      leaguesSlot.innerHTML = '';
+      leaguesSlot.appendChild(leagueCard);
 
       // Metro Areas section box matching Games box (collapsed on initial load)
       const metroCard = document.createElement('div');
@@ -1307,6 +1342,7 @@
         `;
 
         btn.addEventListener('click', () => {
+          hasUserFiltered = true;
           if (selectedMetro === metro) {
             selectedMetro = null;
           } else {
@@ -1325,6 +1361,7 @@
       container.appendChild(metroCard);
 
       document.getElementById('btn-league-all').addEventListener('click', () => {
+        hasUserFiltered = true;
         activeLeaguePreset = 'all';
         selectedLeague = null;
         syncButtonActiveStyles();
@@ -1334,6 +1371,7 @@
       });
 
       document.getElementById('btn-league-big4').addEventListener('click', () => {
+        hasUserFiltered = true;
         activeLeaguePreset = 'big4';
         selectedLeague = null;
         syncButtonActiveStyles();
@@ -1404,7 +1442,7 @@
     function clearDateSelectionState() {
       todayOnlyMode = false;
       dateWindowActive = false;
-      activeDatePreset = null;
+      activeDatePreset = 'none';
       window._espnGamesByLeague = null;
       document.getElementById('date-start').value = '';
       document.getElementById('date-end').value = '';
@@ -1412,6 +1450,7 @@
     }
 
     function setDateFilterState(preset) {
+      hasUserFiltered = true;
       todayOnlyMode = true;
       dateWindowActive = true;
       activeDatePreset = preset;
