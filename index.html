@@ -58,35 +58,51 @@
     }
 
     @media (max-width: 1100px) {
-      #dashboard-wrapper { flex-direction: column; }
-      
-      /* Map takes 38% height on mobile */
-      #map-container { 
-        height: 38vh !important; 
-        order: 1; 
-        width: 100%;
+      html, body {
+        overflow-y: auto;
+        height: auto;
+      }
+      #dashboard-wrapper {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
       }
 
-      /* Panels take remaining bottom space stacked without tabs */
+      /* Map at top on mobile */
+      #map-container {
+        height: 36vh !important;
+        min-height: 240px;
+        order: 1;
+        width: 100%;
+        flex: none;
+      }
+
+      /* Filters pane immediately below map */
       #sidebar {
         width: 100% !important;
-        height: 62vh !important;
+        height: auto !important;
+        max-height: none !important;
         order: 2;
         display: flex !important;
+        flex: none;
+        box-shadow: none;
+        border-bottom: 2px solid #cbd5e1;
+      }
+      #sidebar .sidebar-content {
+        overflow-y: visible;
+        max-height: none;
       }
 
+      /* Detail / List pane immediately below filters pane and always visible */
       #explorer-panel {
         width: 100% !important;
-        height: 62vh !important;
-        order: 2;
-        display: none !important;
-      }
-
-      #explorer-panel.mobile-active {
+        height: auto !important;
+        min-height: 260px;
+        order: 3;
         display: flex !important;
-      }
-      #sidebar.mobile-hidden {
-        display: none !important;
+        flex: none;
+        overflow-y: visible;
+        box-shadow: none;
       }
     }
 
@@ -355,19 +371,68 @@
     .section-header-row:hover { color: #0f172a; }
     .league-preset-btn {
       background: #334155;
-      border: 1px solid #475569;
+      border: 1.5px solid #475569;
       color: #ffffff;
-      border-radius: 4px;
-      padding: 4px 6px;
+      border-radius: 5px;
+      padding: 5px 6px;
       font-size: 10px;
       font-weight: 700;
       cursor: pointer;
       flex: 1;
       text-align: center;
+      transition: all 0.15s ease;
     }
     .league-preset-btn.active {
       background: #0284c7;
       border-color: #0369a1;
+      box-shadow: 0 0 0 1.5px rgba(2, 132, 199, 0.35);
+    }
+    .league-color-btn {
+      border-radius: 5px;
+      padding: 5px 4px;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+      flex: 1;
+      text-align: center;
+      border: 1.5px solid transparent;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .metro-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+    }
+    .metro-chip-btn {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #0f172a;
+      border-radius: 5px;
+      padding: 5px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+    .metro-chip-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .metro-chip-btn.active {
+      background: #1e293b;
+      border-color: #0f172a;
+      color: #ffffff;
+    }
+    .metro-chip-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .games-dropdown-header {
       background: #f8fafc;
@@ -759,7 +824,7 @@
     let todayOnlyMode = false; // True when any date filter is active
     let activeDatePreset = null; // 'today' | 'next3' | 'custom' | null
     let leaguesSectionExpanded = true;
-    let metrosSectionExpanded = true;
+    let metrosSectionExpanded = false; // Collapsed on initial load
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -776,14 +841,10 @@
     }
 
     function showMobilePanel(panelType) {
-      const sidebar = document.getElementById('sidebar');
-      const explorer = document.getElementById('explorer-panel');
-      if (panelType === 'explorer') {
-        explorer.classList.add('mobile-active');
-        sidebar.classList.add('mobile-hidden');
-      } else {
-        explorer.classList.remove('mobile-active');
-        sidebar.classList.remove('mobile-hidden');
+      // Both filters and detail/list panes stay visible on mobile; scroll smoothly if a venue is selected
+      if (window.innerWidth <= 1100 && panelType === 'explorer') {
+        const explorer = document.getElementById('explorer-panel');
+        if (explorer) explorer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       setTimeout(() => { map.invalidateSize(); }, 100);
     }
@@ -802,8 +863,6 @@
     }
 
     function buildTeamsAndVenuesFeedHtml() {
-      const hasSpecificScope = Boolean(selectedLeague || selectedMetro);
-      if (!hasSpecificScope) return '';
       const label = `${getActiveScopeLabel()} Teams & Venues`;
 
       const sortedVenues = [...currentFilteredVenues].sort((a, b) => a.team.localeCompare(b.team));
@@ -842,12 +901,7 @@
 
     function buildScheduledGamesFeedHtml() {
       if (!dateWindowActive) {
-        if (selectedLeague || selectedMetro) return buildTeamsAndVenuesFeedHtml();
-        return `
-          <div>
-            <h2 class="team-title">Select a Team or Venue for Details</h2>
-          </div>
-        `;
+        return buildTeamsAndVenuesFeedHtml();
       }
 
       const entries = [];
@@ -912,10 +966,6 @@
       currentVenueIndex = -1;
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = buildScheduledGamesFeedHtml();
-      document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
-      if (window.innerWidth <= 1100) {
-        showMobilePanel('sidebar');
-      }
     }
 
     async function fetchWikiImage(wikiUrl, venueName) {
@@ -988,13 +1038,6 @@
         showMobilePanel('explorer');
       }
 
-      document.querySelectorAll('.school-item').forEach(el => el.classList.remove('selected-active'));
-      const activeEl = document.getElementById(`school-item-${v.team.replace(/\s+/g, '_')}`);
-      if (activeEl) {
-        activeEl.classList.add('selected-active');
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-
       const imgUrl = await fetchWikiImage(v.wikiUrl, v.venue);
       const photoSlot = document.getElementById('photo-slot');
       if (photoSlot && imgUrl) {
@@ -1045,10 +1088,43 @@
       const allBtn = document.getElementById('btn-league-all');
       const big4Btn = document.getElementById('btn-league-big4');
       if (allBtn && big4Btn) {
+        const isAll = !selectedLeague && activeLeaguePreset === 'all';
         const isBig4 = !selectedLeague && activeLeaguePreset === 'big4';
-        allBtn.classList.toggle('active', !isBig4);
+        allBtn.classList.toggle('active', isAll);
         big4Btn.classList.toggle('active', isBig4);
       }
+
+      document.querySelectorAll('.league-color-btn').forEach(btn => {
+        const lg = btn.getAttribute('data-league');
+        const color = LEAGUE_COLORS[lg] || "#475569";
+        const isSelected = selectedLeague === lg;
+        const isIncluded = !selectedLeague && (activeLeaguePreset === 'all' || (activeLeaguePreset === 'big4' && BIG_4.has(lg)));
+
+        if (isSelected) {
+          btn.style.background = color;
+          btn.style.color = '#ffffff';
+          btn.style.borderColor = '#0f172a';
+          btn.style.boxShadow = `0 0 0 1.5px ${color}`;
+          btn.style.opacity = '1';
+        } else if (isIncluded) {
+          btn.style.background = `${color}22`;
+          btn.style.color = '#0f172a';
+          btn.style.borderColor = color;
+          btn.style.boxShadow = 'none';
+          btn.style.opacity = '1';
+        } else {
+          btn.style.background = '#f8fafc';
+          btn.style.color = '#64748b';
+          btn.style.borderColor = '#cbd5e1';
+          btn.style.boxShadow = 'none';
+          btn.style.opacity = '0.75';
+        }
+      });
+
+      document.querySelectorAll('.metro-chip-btn').forEach(btn => {
+        const metro = decodeURIComponent(btn.getAttribute('data-metro') || '');
+        btn.classList.toggle('active', selectedMetro === metro);
+      });
 
       ['btn-today', 'btn-next-3-days'].forEach(id => {
         const btn = document.getElementById(id);
@@ -1058,6 +1134,28 @@
         btn.style.background = isActive ? '#0284c7' : '#334155';
         btn.style.borderColor = isActive ? '#0369a1' : '#475569';
       });
+    }
+
+    function createLeagueButtonElement(league, count) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'league-color-btn';
+      btn.setAttribute('data-league', league);
+      btn.innerHTML = `${league} <span class="league-count-label" data-league="${league}">(${count})</span>`;
+
+      btn.addEventListener('click', () => {
+        if (selectedLeague === league) {
+          selectedLeague = null;
+        } else {
+          selectedLeague = league;
+          activeLeaguePreset = 'all';
+        }
+        syncButtonActiveStyles();
+        updateMapFilters();
+        zoomMapToScope();
+        resetRightPanel();
+      });
+      return btn;
     }
 
     function renderSidebarTree(leagueGrouped, metroGrouped) {
@@ -1080,18 +1178,40 @@
       leaguesBodyDiv.id = 'leagues-section-body';
       leaguesBodyDiv.style.display = leaguesSectionExpanded ? 'flex' : 'none';
       leaguesBodyDiv.style.flexDirection = 'column';
-      leaguesBodyDiv.style.gap = '6px';
+      leaguesBodyDiv.style.gap = '5px';
 
-      // All Leagues / Big 4 filter buttons at top of Leagues section
-      const presetBar = document.createElement('div');
-      presetBar.style.display = 'flex';
-      presetBar.style.gap = '4px';
-      presetBar.style.width = '100%';
-      presetBar.innerHTML = `
-        <button type="button" class="league-preset-btn" id="btn-league-all">All Leagues</button>
+      // Row 1: All & Big 4
+      const row1 = document.createElement('div');
+      row1.style.display = 'flex';
+      row1.style.gap = '4px';
+      row1.style.width = '100%';
+      row1.innerHTML = `
+        <button type="button" class="league-preset-btn" id="btn-league-all">All</button>
         <button type="button" class="league-preset-btn" id="btn-league-big4">Big 4</button>
       `;
-      leaguesBodyDiv.appendChild(presetBar);
+      leaguesBodyDiv.appendChild(row1);
+
+      // Row 2: Individual Big 4 buttons (NFL, MLB, NBA, NHL)
+      const row2 = document.createElement('div');
+      row2.style.display = 'flex';
+      row2.style.gap = '4px';
+      row2.style.width = '100%';
+      BIG_4_ORDER.forEach(league => {
+        if (!leagueGrouped[league]) return;
+        row2.appendChild(createLeagueButtonElement(league, leagueGrouped[league].length));
+      });
+      leaguesBodyDiv.appendChild(row2);
+
+      // Row 3: Remaining 3 leagues (MLS, NWSL, WNBA)
+      const row3 = document.createElement('div');
+      row3.style.display = 'flex';
+      row3.style.gap = '4px';
+      row3.style.width = '100%';
+      OTHER_LEAGUES_ORDER.forEach(league => {
+        if (!leagueGrouped[league]) return;
+        row3.appendChild(createLeagueButtonElement(league, leagueGrouped[league].length));
+      });
+      leaguesBodyDiv.appendChild(row3);
 
       leagueHeaderRow.addEventListener('click', () => {
         leaguesSectionExpanded = !leaguesSectionExpanded;
@@ -1099,75 +1219,9 @@
         document.getElementById('leagues-section-arrow').textContent = leaguesSectionExpanded ? '▲' : '▼';
       });
 
-      ALL_LEAGUES_ORDER.forEach(league => {
-        if (!leagueGrouped[league]) return;
-        const teams = [...leagueGrouped[league]].sort((a, b) => a.team.localeCompare(b.team));
-        const color = LEAGUE_COLORS[league] || "#475569";
-
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'conf-group';
-
-        const summaryDiv = document.createElement('div');
-        summaryDiv.className = 'conf-summary';
-        summaryDiv.innerHTML = `
-          <div class="conf-info-left">
-            <span class="conf-swatch" style="background:${color};"></span>
-            <span><b>${league}</b> <span class="league-count-label" data-league="${league}">(${teams.length})</span></span>
-          </div>
-          <span class="conf-toggle-arrow">${selectedLeague === league ? '▲' : '▼'}</span>
-        `;
-
-        const listDiv = document.createElement('div');
-        listDiv.className = 'school-list';
-        listDiv.style.display = selectedLeague === league ? 'flex' : 'none';
-
-        summaryDiv.addEventListener('click', () => {
-          const isOpening = selectedLeague !== league;
-          document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-          document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
-
-          if (isOpening) {
-            selectedLeague = league;
-            activeLeaguePreset = 'all';
-            listDiv.style.display = 'flex';
-            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-          } else {
-            selectedLeague = null;
-          }
-
-          syncButtonActiveStyles();
-          updateMapFilters();
-          zoomMapToScope();
-          resetRightPanel();
-        });
-
-        teams.forEach(v => {
-          const itemDiv = document.createElement('div');
-          itemDiv.className = 'school-item';
-          itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
-          itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
-
-          itemDiv.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
-            map.flyTo(v.coords, 15, { duration: 0.8 });
-            if (markersMap[v.team]) {
-              markersMap[v.team].openPopup();
-            }
-            showVenueDetails(v, globalIdx);
-          });
-
-          listDiv.appendChild(itemDiv);
-        });
-
-        groupDiv.appendChild(summaryDiv);
-        groupDiv.appendChild(listDiv);
-        leaguesBodyDiv.appendChild(groupDiv);
-      });
-
       container.appendChild(leaguesBodyDiv);
 
-      // Metro Areas section header with dropdown arrow
+      // Metro Areas section header with dropdown arrow (collapsed on initial load)
       const metroHeaderRow = document.createElement('div');
       metroHeaderRow.className = 'section-header-row';
       metroHeaderRow.innerHTML = `
@@ -1178,13 +1232,12 @@
 
       const metrosBodyDiv = document.createElement('div');
       metrosBodyDiv.id = 'metros-section-body';
-      metrosBodyDiv.style.display = metrosSectionExpanded ? 'flex' : 'none';
-      metrosBodyDiv.style.flexDirection = 'column';
-      metrosBodyDiv.style.gap = '6px';
+      metrosBodyDiv.className = 'metro-grid';
+      metrosBodyDiv.style.display = metrosSectionExpanded ? 'grid' : 'none';
 
       metroHeaderRow.addEventListener('click', () => {
         metrosSectionExpanded = !metrosSectionExpanded;
-        metrosBodyDiv.style.display = metrosSectionExpanded ? 'flex' : 'none';
+        metrosBodyDiv.style.display = metrosSectionExpanded ? 'grid' : 'none';
         document.getElementById('metros-section-arrow').textContent = metrosSectionExpanded ? '▲' : '▼';
       });
 
@@ -1195,64 +1248,29 @@
       });
 
       sortedMetros.forEach(metro => {
-        const teams = [...metroGrouped[metro]].sort((a, b) => a.team.localeCompare(b.team));
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'conf-group';
-
-        const summaryDiv = document.createElement('div');
-        summaryDiv.className = 'conf-summary';
-        summaryDiv.innerHTML = `
-          <div class="conf-info-left">
-            <span class="conf-swatch" style="background:#64748b;"></span>
-            <span><b>${metro}</b> <span class="metro-count-label" data-metro="${encodeURIComponent(metro)}">(${teams.length})</span></span>
-          </div>
-          <span class="conf-toggle-arrow">${selectedMetro === metro ? '▲' : '▼'}</span>
+        const encodedMetro = encodeURIComponent(metro);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'metro-chip-btn';
+        btn.setAttribute('data-metro', encodedMetro);
+        btn.innerHTML = `
+          <span class="metro-chip-name">${metro}</span>
+          <span class="metro-count-label" data-metro="${encodedMetro}">(${metroGrouped[metro].length})</span>
         `;
 
-        const listDiv = document.createElement('div');
-        listDiv.className = 'school-list';
-        listDiv.style.display = selectedMetro === metro ? 'flex' : 'none';
-
-        summaryDiv.addEventListener('click', () => {
-          const isOpening = selectedMetro !== metro;
-          if (isOpening) {
-            selectedMetro = metro;
-            listDiv.style.display = 'flex';
-            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-          } else {
+        btn.addEventListener('click', () => {
+          if (selectedMetro === metro) {
             selectedMetro = null;
-            listDiv.style.display = 'none';
-            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▼';
+          } else {
+            selectedMetro = metro;
           }
-
           syncButtonActiveStyles();
           updateMapFilters();
           zoomMapToScope();
           resetRightPanel();
         });
 
-        teams.forEach(v => {
-          const itemDiv = document.createElement('div');
-          itemDiv.className = 'school-item';
-          itemDiv.id = `school-item-${v.team.replace(/\s+/g, '_')}`;
-          itemDiv.innerHTML = `<span class="school-name">${v.team}</span>`;
-
-          itemDiv.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const globalIdx = currentFilteredVenues.findIndex(item => item.team === v.team);
-            map.flyTo(v.coords, 15, { duration: 0.8 });
-            if (markersMap[v.team]) {
-              markersMap[v.team].openPopup();
-            }
-            showVenueDetails(v, globalIdx);
-          });
-
-          listDiv.appendChild(itemDiv);
-        });
-
-        groupDiv.appendChild(summaryDiv);
-        groupDiv.appendChild(listDiv);
-        metrosBodyDiv.appendChild(groupDiv);
+        metrosBodyDiv.appendChild(btn);
       });
 
       container.appendChild(metrosBodyDiv);
@@ -1260,8 +1278,6 @@
       document.getElementById('btn-league-all').addEventListener('click', () => {
         activeLeaguePreset = 'all';
         selectedLeague = null;
-        document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
         syncButtonActiveStyles();
         updateMapFilters();
         zoomMapToScope();
@@ -1271,8 +1287,6 @@
       document.getElementById('btn-league-big4').addEventListener('click', () => {
         activeLeaguePreset = 'big4';
         selectedLeague = null;
-        document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
         syncButtonActiveStyles();
         updateMapFilters();
         zoomMapToScope();
