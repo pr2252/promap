@@ -561,7 +561,7 @@
           <div id="leagues-slot" style="display:flex; flex-direction:column;"></div>
           <div class="filter-card-box" id="home-games-dropdown-group">
             <div class="filter-card-header" id="home-games-dropdown-toggle">
-              <span>Upcoming Games</span>
+              <span>Upcoming Home Games</span>
               <span id="home-games-dropdown-arrow" style="font-size:9px; color:#64748b;">▼</span>
             </div>
             <div class="filter-card-body" id="home-games-dropdown-body" style="display:none; flex-direction:column; gap:6px;">
@@ -590,7 +590,7 @@
       <!-- Right Explorer Panel -->
       <div id="explorer-panel">
         <div class="panel-body" id="panel-content">
-          <div class="photo-placeholder">Select a filter for Leagues or Upcoming Games to see more details.</div>
+          <div class="photo-placeholder">Select a filter for Leagues or Upcoming Home Games to see more details.</div>
         </div>
         <div class="nav-bar-banner" id="detail-nav-bar" style="display: none;">
           <div style="display: flex; gap: 4px; width: 100%;">
@@ -1024,7 +1024,7 @@
     }
 
     function renderEmptyDetailMessage() {
-      return '<div class="photo-placeholder">Select a filter for Leagues or Upcoming Games to see more details.</div>';
+      return '<div class="photo-placeholder">Select a filter for Leagues or Upcoming Home Games to see more details.</div>';
     }
 
     function resetRightPanel() {
@@ -1102,7 +1102,7 @@
         </div>
         ${v.nextHomeGame ? `<div class="notes-box" style="background:${color}14; border-color:${color}66; border-left:4px solid ${color}; color:#0f172a;"><b>Next Home Game:</b> ${v.nextHomeGame}</div>` : ''}
         ${uniqueWindowGames.length ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Selected Dates'}:</b><br>${uniqueWindowGames.join('<br>')}</div>` : ''}
-        ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
+        ${v.notes ? `<div class="notes-box"><b>Venue Notes:</b> ${v.notes}</div>` : ''}
       `;
 
       if (window.innerWidth <= 1100) {
