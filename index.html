@@ -336,12 +336,19 @@
     }
     .wiki-btn:hover { background: #0369a1; }
 
+    #explorer-panel .nav-bar-banner {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-bottom: 1px solid #cbd5e1;
+      box-shadow: none;
+      padding: 8px 12px;
+    }
     .back-conf-btn {
-      background: #334155;
-      color: #ffffff;
-      border: 1.5px solid #475569;
-      border-radius: 4px;
-      padding: 4px 8px;
+      background: #ffffff;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 5px 8px;
       font-size: 10px;
       font-weight: 700;
       cursor: pointer;
@@ -350,7 +357,33 @@
       flex: 1;
       box-sizing: border-box;
     }
-    .back-conf-btn:hover { background: #475569; color: #ffffff; }
+    .back-conf-btn:hover { background: #e2e8f0; color: #0f172a; }
+    .filter-card-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #ffffff;
+      flex-shrink: 0;
+    }
+    .filter-card-header {
+      background: #f8fafc;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #0f172a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 6px;
+    }
+    .filter-card-header:hover { background: #f1f5f9; }
+    .filter-card-body {
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      border-radius: 0 0 6px 6px;
+      padding: 8px 10px;
+    }
 
     .venue-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-size: 10px; font-weight: 500; padding: 2px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .section-header-row {
@@ -505,12 +538,12 @@
 
       </div>
       <div class="sidebar-content" id="sidebar-tree-wrap" style="gap: 8px;">
-        <div class="conf-group" id="home-games-dropdown-group" style="flex-shrink:0;">
-          <div class="games-dropdown-header" id="home-games-dropdown-toggle">
-            <span>View Home Games by Date</span>
+        <div class="filter-card-box" id="home-games-dropdown-group">
+          <div class="filter-card-header" id="home-games-dropdown-toggle">
+            <span>Games</span>
             <span id="home-games-dropdown-arrow" style="font-size:9px; color:#64748b;">▼</span>
           </div>
-          <div class="games-dropdown-body" id="home-games-dropdown-body" style="display:none;">
+          <div class="filter-card-body" id="home-games-dropdown-body" style="display:none; flex-direction:column; gap:6px;">
             <div style="display:flex; gap:4px; width:100%;">
               <button class="btn-action" id="btn-today" style="background:#334155; border-color:#475569; color:#fff;">Today</button>
               <button class="btn-action" id="btn-next-3-days" style="background:#334155; border-color:#475569; color:#fff;">Next 3 Days</button>
@@ -535,7 +568,7 @@
 
     <!-- Right Explorer Panel -->
     <div id="explorer-panel">
-      <div class="nav-bar-banner">
+      <div class="nav-bar-banner" id="detail-nav-bar" style="display: none;">
         <div style="display: flex; gap: 4px; width: 100%;">
           <button class="back-conf-btn" id="back-to-conf-btn">&larr; Reset View</button>
           <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
@@ -962,8 +995,14 @@
       showVenueDetails(target, globalIdx);
     };
 
+    function setDetailNavVisible(visible) {
+      const navEl = document.getElementById('detail-nav-bar');
+      if (navEl) navEl.style.display = visible ? 'flex' : 'none';
+    }
+
     function resetRightPanel() {
       currentVenueIndex = -1;
+      setDetailNavVisible(false);
       const panelContent = document.getElementById('panel-content');
       panelContent.innerHTML = buildScheduledGamesFeedHtml();
     }
@@ -997,6 +1036,7 @@
     }
 
     async function showVenueDetails(v, index = -1) {
+      setDetailNavVisible(true);
       if (index !== -1) {
         currentVenueIndex = index;
       } else {
@@ -1165,17 +1205,21 @@
       const container = document.getElementById('sidebar-tree');
       container.innerHTML = '';
 
-      // Leagues section header with dropdown arrow
+      // Leagues section box matching Games box
+      const leagueCard = document.createElement('div');
+      leagueCard.className = 'filter-card-box';
+
       const leagueHeaderRow = document.createElement('div');
-      leagueHeaderRow.className = 'section-header-row';
+      leagueHeaderRow.className = 'filter-card-header';
       leagueHeaderRow.innerHTML = `
         <span>Leagues</span>
-        <span id="leagues-section-arrow">${leaguesSectionExpanded ? '▲' : '▼'}</span>
+        <span id="leagues-section-arrow" style="font-size:9px; color:#64748b;">${leaguesSectionExpanded ? '▲' : '▼'}</span>
       `;
-      container.appendChild(leagueHeaderRow);
+      leagueCard.appendChild(leagueHeaderRow);
 
       const leaguesBodyDiv = document.createElement('div');
       leaguesBodyDiv.id = 'leagues-section-body';
+      leaguesBodyDiv.className = 'filter-card-body';
       leaguesBodyDiv.style.display = leaguesSectionExpanded ? 'flex' : 'none';
       leaguesBodyDiv.style.flexDirection = 'column';
       leaguesBodyDiv.style.gap = '5px';
@@ -1219,20 +1263,24 @@
         document.getElementById('leagues-section-arrow').textContent = leaguesSectionExpanded ? '▲' : '▼';
       });
 
-      container.appendChild(leaguesBodyDiv);
+      leagueCard.appendChild(leaguesBodyDiv);
+      container.appendChild(leagueCard);
 
-      // Metro Areas section header with dropdown arrow (collapsed on initial load)
+      // Metro Areas section box matching Games box (collapsed on initial load)
+      const metroCard = document.createElement('div');
+      metroCard.className = 'filter-card-box';
+
       const metroHeaderRow = document.createElement('div');
-      metroHeaderRow.className = 'section-header-row';
+      metroHeaderRow.className = 'filter-card-header';
       metroHeaderRow.innerHTML = `
         <span>Metro Areas</span>
-        <span id="metros-section-arrow">${metrosSectionExpanded ? '▲' : '▼'}</span>
+        <span id="metros-section-arrow" style="font-size:9px; color:#64748b;">${metrosSectionExpanded ? '▲' : '▼'}</span>
       `;
-      container.appendChild(metroHeaderRow);
+      metroCard.appendChild(metroHeaderRow);
 
       const metrosBodyDiv = document.createElement('div');
       metrosBodyDiv.id = 'metros-section-body';
-      metrosBodyDiv.className = 'metro-grid';
+      metrosBodyDiv.className = 'filter-card-body metro-grid';
       metrosBodyDiv.style.display = metrosSectionExpanded ? 'grid' : 'none';
 
       metroHeaderRow.addEventListener('click', () => {
@@ -1273,7 +1321,8 @@
         metrosBodyDiv.appendChild(btn);
       });
 
-      container.appendChild(metrosBodyDiv);
+      metroCard.appendChild(metrosBodyDiv);
+      container.appendChild(metroCard);
 
       document.getElementById('btn-league-all').addEventListener('click', () => {
         activeLeaguePreset = 'all';
