@@ -337,6 +337,38 @@
     .back-conf-btn:hover { background: #475569; color: #ffffff; }
 
     .venue-tooltip { background: rgba(255, 255, 255, 0.95); border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-size: 10px; font-weight: 500; padding: 2px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .section-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 4px 2px 2px 4px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .section-header-row:hover { color: #0f172a; }
+    .league-preset-btn {
+      background: #334155;
+      border: 1px solid #475569;
+      color: #ffffff;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      flex: 1;
+      text-align: center;
+    }
+    .league-preset-btn.active {
+      background: #0284c7;
+      border-color: #0369a1;
+    }
     .games-dropdown-header {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -405,10 +437,6 @@
           <span>Pro Sports</span>
           <span id="active-count" style="font-size: 11px; font-weight: 600; opacity: 0.9;">Loading...</span>
         </div>
-        <div style="display: flex; gap: 4px; width: 100%;">
-          <button class="btn-action active" id="btn-select-all" style="background:#334155; border-color:#475569; color:#fff;">All Leagues</button>
-          <button class="btn-action" id="btn-big-4" style="background:#334155; border-color:#475569; color:#fff;">Big 4</button>
-        </div>
       </div>
       <div class="sidebar-content" id="sidebar-tree-wrap" style="gap: 8px;">
         <div class="conf-group" id="home-games-dropdown-group" style="flex-shrink:0;">
@@ -443,7 +471,7 @@
     <div id="explorer-panel">
       <div class="nav-bar-banner">
         <div style="display: flex; gap: 4px; width: 100%;">
-          <button class="back-conf-btn" id="back-to-conf-btn">USA View</button>
+          <button class="back-conf-btn" id="back-to-conf-btn">&larr; Reset View</button>
           <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
           <button class="back-conf-btn" id="next-venue-btn">Next</button>
         </div>
@@ -717,12 +745,20 @@
     const venueLayer = L.layerGroup().addTo(map);
 
     let venues = [];
+    let storedLeagueGrouped = {};
+    let storedMetroGrouped = {};
     let currentFilteredVenues = [];
     let currentVenueIndex = -1;
-    let markersMap = {}; 
-    let activeFilterKey = null; // Can be league name or "metro:MetroName"
-    let todayOnlyMode = false; // Keeps selected date filter active while narrowing by league or metro
+    let markersMap = {};
+
+    // Independent filter states (persist across selections in any order)
+    let activeLeaguePreset = 'all'; // 'all' | 'big4'
+    let selectedLeague = null; // e.g., 'NFL', 'MLB', or null
+    let selectedMetro = null; // e.g., 'New York', or null
+    let todayOnlyMode = false; // True when any date filter is active
     let activeDatePreset = null; // 'today' | 'next3' | 'custom' | null
+    let leaguesSectionExpanded = true;
+    let metrosSectionExpanded = true;
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -757,11 +793,17 @@
       return Number((entry.ymd || '99999999') + '0000');
     }
 
+    function getActiveScopeLabel() {
+      if (selectedLeague && selectedMetro) return `${selectedLeague} • ${selectedMetro}`;
+      if (selectedLeague) return selectedLeague;
+      if (selectedMetro) return selectedMetro;
+      return activeLeaguePreset === 'big4' ? 'Big 4' : 'All Leagues';
+    }
+
     function buildTeamsAndVenuesFeedHtml() {
-      if (!activeFilterKey) return '';
-      const label = activeFilterKey.startsWith('metro:')
-        ? `${activeFilterKey.substring(6)} Teams & Venues`
-        : `${activeFilterKey} Teams & Venues`;
+      const hasSpecificScope = Boolean(selectedLeague || selectedMetro);
+      if (!hasSpecificScope) return '';
+      const label = `${getActiveScopeLabel()} Teams & Venues`;
 
       const sortedVenues = [...currentFilteredVenues].sort((a, b) => a.team.localeCompare(b.team));
       if (!sortedVenues.length) {
@@ -799,7 +841,7 @@
 
     function buildScheduledGamesFeedHtml() {
       if (!dateWindowActive) {
-        if (activeFilterKey) return buildTeamsAndVenuesFeedHtml();
+        if (selectedLeague || selectedMetro) return buildTeamsAndVenuesFeedHtml();
         return `
           <div>
             <h2 class="team-title">Select a Team or Venue for Details</h2>
@@ -820,9 +862,8 @@
         return a.team.localeCompare(b.team);
       });
 
-      const headingText = activeFilterKey && activeFilterKey.startsWith('metro:')
-        ? `Scheduled Games (${activeDateRangeLabel})`
-        : `Scheduled Home Games (${activeDateRangeLabel})`;
+      const scopePrefix = (selectedLeague || selectedMetro) ? `${getActiveScopeLabel()} ` : '';
+      const headingText = `${scopePrefix}Scheduled Home Games (${activeDateRangeLabel})`;
 
       if (!entries.length) {
         return `
@@ -960,18 +1001,106 @@
       }
     }
 
+    function doesVenueMatchFilters(v, opts = {}) {
+      const ignoreLeague = Boolean(opts.ignoreLeague);
+      const ignoreMetro = Boolean(opts.ignoreMetro);
+      const ignorePreset = Boolean(opts.ignorePreset);
+      const dateActive = todayOnlyMode || dateWindowActive;
+
+      if (!ignoreLeague && selectedLeague && v.league !== selectedLeague) return false;
+      if (!ignoreMetro && selectedMetro && v.metro !== selectedMetro) return false;
+      if (!ignorePreset && !selectedLeague && activeLeaguePreset === 'big4' && !BIG_4.has(v.league)) return false;
+      if (dateActive && !v.isPlayingInWindow) return false;
+      return true;
+    }
+
+    function countMatchingItemsForVenue(v) {
+      const dateActive = todayOnlyMode || dateWindowActive;
+      if (dateActive) {
+        return Array.isArray(v.windowGameEntries) ? v.windowGameEntries.length : (v.isPlayingInWindow ? 1 : 0);
+      }
+      return 1;
+    }
+
+    function zoomMapToScope() {
+      if (selectedMetro && storedMetroGrouped[selectedMetro]) {
+        const metroTeams = storedMetroGrouped[selectedMetro].filter(v => doesVenueMatchFilters(v, { ignoreMetro: true }));
+        const targetList = metroTeams.length ? metroTeams : storedMetroGrouped[selectedMetro];
+        const lats = targetList.map(t => t.coords[0]);
+        const lngs = targetList.map(t => t.coords[1]);
+        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+        if (targetList.length === 1) {
+          map.flyTo([(minLat + maxLat) / 2, (minLng + maxLng) / 2], 13, { duration: 0.8 });
+        } else {
+          map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], maxZoom: 12, duration: 0.8 });
+        }
+        return;
+      }
+      map.setView([39.8283, -98.5795], getNationalZoom());
+    }
+
+    function syncButtonActiveStyles() {
+      const allBtn = document.getElementById('btn-league-all');
+      const big4Btn = document.getElementById('btn-league-big4');
+      if (allBtn && big4Btn) {
+        const isBig4 = !selectedLeague && activeLeaguePreset === 'big4';
+        allBtn.classList.toggle('active', !isBig4);
+        big4Btn.classList.toggle('active', isBig4);
+      }
+
+      ['btn-today', 'btn-next-3-days'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const isActive = (id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3');
+        btn.classList.toggle('active', isActive);
+        btn.style.background = isActive ? '#0284c7' : '#334155';
+        btn.style.borderColor = isActive ? '#0369a1' : '#475569';
+      });
+    }
+
     function renderSidebarTree(leagueGrouped, metroGrouped) {
+      storedLeagueGrouped = leagueGrouped;
+      storedMetroGrouped = metroGrouped;
+
       const container = document.getElementById('sidebar-tree');
       container.innerHTML = '';
 
-      const heading = document.createElement('div');
-      heading.className = 'section-heading';
-      heading.textContent = "Leagues";
-      container.appendChild(heading);
+      // Leagues section header with dropdown arrow
+      const leagueHeaderRow = document.createElement('div');
+      leagueHeaderRow.className = 'section-header-row';
+      leagueHeaderRow.innerHTML = `
+        <span>Leagues</span>
+        <span id="leagues-section-arrow">${leaguesSectionExpanded ? '▲' : '▼'}</span>
+      `;
+      container.appendChild(leagueHeaderRow);
+
+      const leaguesBodyDiv = document.createElement('div');
+      leaguesBodyDiv.id = 'leagues-section-body';
+      leaguesBodyDiv.style.display = leaguesSectionExpanded ? 'flex' : 'none';
+      leaguesBodyDiv.style.flexDirection = 'column';
+      leaguesBodyDiv.style.gap = '6px';
+
+      // All Leagues / Big 4 filter buttons at top of Leagues section
+      const presetBar = document.createElement('div');
+      presetBar.style.display = 'flex';
+      presetBar.style.gap = '4px';
+      presetBar.style.width = '100%';
+      presetBar.innerHTML = `
+        <button type="button" class="league-preset-btn" id="btn-league-all">All Leagues</button>
+        <button type="button" class="league-preset-btn" id="btn-league-big4">Big 4</button>
+      `;
+      leaguesBodyDiv.appendChild(presetBar);
+
+      leagueHeaderRow.addEventListener('click', () => {
+        leaguesSectionExpanded = !leaguesSectionExpanded;
+        leaguesBodyDiv.style.display = leaguesSectionExpanded ? 'flex' : 'none';
+        document.getElementById('leagues-section-arrow').textContent = leaguesSectionExpanded ? '▲' : '▼';
+      });
 
       ALL_LEAGUES_ORDER.forEach(league => {
         if (!leagueGrouped[league]) return;
-        const teams = leagueGrouped[league].sort((a, b) => a.team.localeCompare(b.team));
+        const teams = [...leagueGrouped[league]].sort((a, b) => a.team.localeCompare(b.team));
         const color = LEAGUE_COLORS[league] || "#475569";
 
         const groupDiv = document.createElement('div');
@@ -982,45 +1111,32 @@
         summaryDiv.innerHTML = `
           <div class="conf-info-left">
             <span class="conf-swatch" style="background:${color};"></span>
-            <span><b>${league}</b> (${teams.length})</span>
+            <span><b>${league}</b> <span class="league-count-label" data-league="${league}">(${teams.length})</span></span>
           </div>
-          <span class="conf-toggle-arrow">▼</span>
+          <span class="conf-toggle-arrow">${selectedLeague === league ? '▲' : '▼'}</span>
         `;
 
         const listDiv = document.createElement('div');
         listDiv.className = 'school-list';
-        listDiv.style.display = 'none';
+        listDiv.style.display = selectedLeague === league ? 'flex' : 'none';
 
         summaryDiv.addEventListener('click', () => {
-          const isHidden = listDiv.style.display === 'none';
-
+          const isOpening = selectedLeague !== league;
           document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
           document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
 
-          if (isHidden) {
+          if (isOpening) {
+            selectedLeague = league;
+            activeLeaguePreset = 'all';
             listDiv.style.display = 'flex';
             summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-            activeFilterKey = league;
           } else {
-            activeFilterKey = null;
+            selectedLeague = null;
           }
 
-          ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (!btn) return;
-            if ((id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3')) {
-              btn.classList.add('active');
-              btn.style.background = '#0284c7';
-              btn.style.borderColor = '#0369a1';
-            } else {
-              btn.classList.remove('active');
-              btn.style.background = '#334155';
-              btn.style.borderColor = '#475569';
-            }
-          });
-
+          syncButtonActiveStyles();
           updateMapFilters();
-          map.setView([39.8283, -98.5795], getNationalZoom());
+          zoomMapToScope();
           resetRightPanel();
         });
 
@@ -1045,16 +1161,32 @@
 
         groupDiv.appendChild(summaryDiv);
         groupDiv.appendChild(listDiv);
-        container.appendChild(groupDiv);
+        leaguesBodyDiv.appendChild(groupDiv);
       });
 
-      // Metro Areas Section
-      const metroHeading = document.createElement('div');
-      metroHeading.className = 'section-heading';
-      metroHeading.textContent = "Metro Areas";
-      container.appendChild(metroHeading);
+      container.appendChild(leaguesBodyDiv);
 
-      // Sort metros by total number of teams descending, then alphabetically by name
+      // Metro Areas section header with dropdown arrow
+      const metroHeaderRow = document.createElement('div');
+      metroHeaderRow.className = 'section-header-row';
+      metroHeaderRow.innerHTML = `
+        <span>Metro Areas</span>
+        <span id="metros-section-arrow">${metrosSectionExpanded ? '▲' : '▼'}</span>
+      `;
+      container.appendChild(metroHeaderRow);
+
+      const metrosBodyDiv = document.createElement('div');
+      metrosBodyDiv.id = 'metros-section-body';
+      metrosBodyDiv.style.display = metrosSectionExpanded ? 'flex' : 'none';
+      metrosBodyDiv.style.flexDirection = 'column';
+      metrosBodyDiv.style.gap = '6px';
+
+      metroHeaderRow.addEventListener('click', () => {
+        metrosSectionExpanded = !metrosSectionExpanded;
+        metrosBodyDiv.style.display = metrosSectionExpanded ? 'flex' : 'none';
+        document.getElementById('metros-section-arrow').textContent = metrosSectionExpanded ? '▲' : '▼';
+      });
+
       const sortedMetros = Object.keys(metroGrouped).sort((a, b) => {
         const countDiff = metroGrouped[b].length - metroGrouped[a].length;
         if (countDiff !== 0) return countDiff;
@@ -1062,7 +1194,7 @@
       });
 
       sortedMetros.forEach(metro => {
-        const teams = metroGrouped[metro].sort((a, b) => a.team.localeCompare(b.team));
+        const teams = [...metroGrouped[metro]].sort((a, b) => a.team.localeCompare(b.team));
         const groupDiv = document.createElement('div');
         groupDiv.className = 'conf-group';
 
@@ -1071,59 +1203,30 @@
         summaryDiv.innerHTML = `
           <div class="conf-info-left">
             <span class="conf-swatch" style="background:#64748b;"></span>
-            <span><b>${metro}</b> (${teams.length})</span>
+            <span><b>${metro}</b> <span class="metro-count-label" data-metro="${encodeURIComponent(metro)}">(${teams.length})</span></span>
           </div>
-          <span class="conf-toggle-arrow">▼</span>
+          <span class="conf-toggle-arrow">${selectedMetro === metro ? '▲' : '▼'}</span>
         `;
 
         const listDiv = document.createElement('div');
         listDiv.className = 'school-list';
-        listDiv.style.display = 'none';
+        listDiv.style.display = selectedMetro === metro ? 'flex' : 'none';
 
         summaryDiv.addEventListener('click', () => {
-          const isHidden = listDiv.style.display === 'none';
-
-          document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-          document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
-
-          if (isHidden) {
+          const isOpening = selectedMetro !== metro;
+          if (isOpening) {
+            selectedMetro = metro;
             listDiv.style.display = 'flex';
             summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▲';
-            activeFilterKey = "metro:" + metro;
-
-            // Compute bounding box or center for metro teams to zoom in
-            let lats = teams.map(t => t.coords[0]);
-            let lngs = teams.map(t => t.coords[1]);
-            let minLat = Math.min(...lats), maxLat = Math.max(...lats);
-            let minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-            let centerLat = (minLat + maxLat) / 2;
-            let centerLng = (minLng + maxLng) / 2;
-
-            if (teams.length === 1) {
-              map.flyTo([centerLat, centerLng], 13, { duration: 0.8 });
-            } else {
-              map.fitBounds([[minLat, minLng], [maxLat, maxLng]], { padding: [50, 50], maxZoom: 12, duration: 0.8 });
-            }
           } else {
-            activeFilterKey = null;
-            map.setView([39.8283, -98.5795], getNationalZoom());
+            selectedMetro = null;
+            listDiv.style.display = 'none';
+            summaryDiv.querySelector('.conf-toggle-arrow').textContent = '▼';
           }
 
-          ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (!btn) return;
-            if ((id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3')) {
-              btn.classList.add('active');
-              btn.style.background = '#0284c7';
-              btn.style.borderColor = '#0369a1';
-            } else {
-              btn.classList.remove('active');
-              btn.style.background = '#334155';
-              btn.style.borderColor = '#475569';
-            }
-          });
-
+          syncButtonActiveStyles();
           updateMapFilters();
+          zoomMapToScope();
           resetRightPanel();
         });
 
@@ -1148,45 +1251,67 @@
 
         groupDiv.appendChild(summaryDiv);
         groupDiv.appendChild(listDiv);
-        container.appendChild(groupDiv);
+        metrosBodyDiv.appendChild(groupDiv);
       });
 
-      updateMapFilters();
+      container.appendChild(metrosBodyDiv);
+
+      document.getElementById('btn-league-all').addEventListener('click', () => {
+        activeLeaguePreset = 'all';
+        selectedLeague = null;
+        document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+        syncButtonActiveStyles();
+        updateMapFilters();
+        zoomMapToScope();
+        resetRightPanel();
+      });
+
+      document.getElementById('btn-league-big4').addEventListener('click', () => {
+        activeLeaguePreset = 'big4';
+        selectedLeague = null;
+        document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+        syncButtonActiveStyles();
+        updateMapFilters();
+        zoomMapToScope();
+        resetRightPanel();
+      });
+
+      syncButtonActiveStyles();
+      updateDynamicFilterCounts();
+    }
+
+    function updateDynamicFilterCounts() {
+      document.querySelectorAll('.league-count-label').forEach(el => {
+        const league = el.getAttribute('data-league');
+        const list = storedLeagueGrouped[league] || [];
+        let total = 0;
+        list.forEach(v => {
+          if (doesVenueMatchFilters(v, { ignoreLeague: true, ignorePreset: true })) {
+            total += countMatchingItemsForVenue(v);
+          }
+        });
+        el.textContent = `(${total})`;
+      });
+
+      document.querySelectorAll('.metro-count-label').forEach(el => {
+        const metro = decodeURIComponent(el.getAttribute('data-metro') || '');
+        const list = storedMetroGrouped[metro] || [];
+        let total = 0;
+        list.forEach(v => {
+          if (doesVenueMatchFilters(v, { ignoreMetro: true })) {
+            total += countMatchingItemsForVenue(v);
+          }
+        });
+        el.textContent = `(${total})`;
+      });
     }
 
     function updateMapFilters() {
       venueLayer.clearLayers();
       markersMap = {};
-      currentFilteredVenues = [];
-
-      const btnAll = document.getElementById('btn-select-all');
-      const btnBig4 = document.getElementById('btn-big-4');
-      const todayActive = todayOnlyMode || dateWindowActive;
-
-      venues.forEach(v => {
-        let show = false;
-        if (activeFilterKey) {
-          if (activeFilterKey.startsWith("metro:")) {
-            const targetMetro = activeFilterKey.substring(6);
-            show = (v.metro === targetMetro);
-          } else {
-            show = (v.league === activeFilterKey);
-          }
-          if (todayActive) show = show && Boolean(v.isPlayingInWindow);
-        } else if (todayActive) {
-          show = Boolean(v.isPlayingInWindow);
-        } else if (btnBig4 && btnBig4.classList.contains('active')) {
-          show = BIG_4.has(v.league);
-        } else if (btnAll && btnAll.classList.contains('active')) {
-          show = true;
-        } else {
-          show = true;
-        }
-
-        if (show) {
-          currentFilteredVenues.push(v);
-        }
-      });
+      currentFilteredVenues = venues.filter(v => doesVenueMatchFilters(v));
 
       if (currentVenueIndex === -1) {
         resetRightPanel();
@@ -1207,6 +1332,7 @@
         markersMap[v.team] = marker;
       });
 
+      updateDynamicFilterCounts();
       document.getElementById('active-count').textContent = `${currentFilteredVenues.length} of ${venues.length} teams shown`;
       updateBasemapForZoom();
     }
@@ -1218,51 +1344,14 @@
       window._espnGamesByLeague = null;
       document.getElementById('date-start').value = '';
       document.getElementById('date-end').value = '';
-      ['btn-today', 'btn-next-3-days'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.classList.remove('active');
-        btn.style.background = '#334155';
-        btn.style.borderColor = '#475569';
-      });
+      syncButtonActiveStyles();
     }
 
-    function setActiveFilterButton(btnId) {
-      if (btnId === 'btn-select-all' || btnId === 'btn-big-4') {
-        clearDateSelectionState();
-      } else if (btnId === 'btn-today') {
-        todayOnlyMode = true;
-        dateWindowActive = true;
-        activeDatePreset = 'today';
-      } else if (btnId === 'btn-next-3-days') {
-        todayOnlyMode = true;
-        dateWindowActive = true;
-        activeDatePreset = 'next3';
-      } else if (btnId === 'btn-apply-dates') {
-        todayOnlyMode = true;
-        dateWindowActive = true;
-        activeDatePreset = 'custom';
-      }
-
-      ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.classList.remove('active');
-        btn.style.background = '#334155';
-        btn.style.borderColor = '#475569';
-      });
-
-      const activeBtn = document.getElementById(btnId);
-      if (activeBtn && btnId !== 'btn-apply-dates') {
-        activeBtn.classList.add('active');
-        activeBtn.style.background = '#0284c7';
-        activeBtn.style.borderColor = '#0369a1';
-      }
-
-      activeFilterKey = null;
-      document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
-      map.setView([39.8283, -98.5795], getNationalZoom());
+    function setDateFilterState(preset) {
+      todayOnlyMode = true;
+      dateWindowActive = true;
+      activeDatePreset = preset;
+      syncButtonActiveStyles();
       resetRightPanel();
     }
 
@@ -1334,22 +1423,12 @@
       arrowEl.textContent = isHidden ? '▲' : '▼';
     });
 
-    /* Top Filter Buttons */
-    document.getElementById('btn-select-all').addEventListener('click', () => {
-      setActiveFilterButton('btn-select-all');
-      applyScheduleToVenues();
-      updateMapFilters();
-    });
-    document.getElementById('btn-big-4').addEventListener('click', () => {
-      setActiveFilterButton('btn-big-4');
-      applyScheduleToVenues();
-      updateMapFilters();
-    });
+    /* Date & Reset Filter Buttons (preserve active league and metro filters) */
     document.getElementById('btn-today').addEventListener('click', async () => {
       const todayIso = formatIsoLocalDate(new Date());
       document.getElementById('date-start').value = todayIso;
       document.getElementById('date-end').value = '';
-      setActiveFilterButton('btn-today');
+      setDateFilterState('today');
       document.getElementById('active-count').textContent = "Checking today's games...";
       await fetchScoreboardsForRange(todayIso, todayIso, 'Today');
     });
@@ -1361,29 +1440,15 @@
       const endIso = formatIsoLocalDate(endDt);
       document.getElementById('date-start').value = startIso;
       document.getElementById('date-end').value = endIso;
-      setActiveFilterButton('btn-next-3-days');
+      setDateFilterState('next3');
       document.getElementById('active-count').textContent = "Checking Next 3 Days...";
       await fetchScoreboardsForRange(startIso, endIso, 'Next 3 Days');
     });
     document.getElementById('btn-reset-dates').addEventListener('click', () => {
       clearDateSelectionState();
-      activeFilterKey = null;
-      document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
-      ['btn-select-all', 'btn-big-4'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.classList.remove('active');
-        btn.style.background = '#334155';
-        btn.style.borderColor = '#475569';
-      });
-      const allBtn = document.getElementById('btn-select-all');
-      allBtn.classList.add('active');
-      allBtn.style.background = '#0284c7';
-      allBtn.style.borderColor = '#0369a1';
       applyScheduleToVenues();
       updateMapFilters();
-      map.setView([39.8283, -98.5795], getNationalZoom());
+      zoomMapToScope();
       resetRightPanel();
     });
 
@@ -1392,17 +1457,12 @@
       const endVal = document.getElementById('date-end').value || startVal;
       if (!startVal) return;
       const label = startVal === endVal ? startVal : `${startVal} to ${endVal}`;
-      setActiveFilterButton('btn-apply-dates');
+      setDateFilterState('custom');
       document.getElementById('active-count').textContent = `Checking ${label}...`;
       await fetchScoreboardsForRange(startVal, endVal, label);
     });
 
     fetchNextHomeGamesForAllVenues();
-
-    /* Initialize initial active button state color */
-    const initialActiveBtn = document.getElementById('btn-select-all');
-    initialActiveBtn.style.background = '#0284c7';
-    initialActiveBtn.style.borderColor = '#0369a1';
 
     /* Navigation Listeners */
     document.getElementById('back-to-conf-btn').addEventListener('click', () => {
