@@ -406,20 +406,21 @@
           <span id="active-count" style="font-size: 11px; font-weight: 600; opacity: 0.9;">Loading...</span>
         </div>
         <div style="display: flex; gap: 4px; width: 100%;">
-          <button class="btn-action active" id="btn-select-all" style="background:#334155; border-color:#475569; color:#fff;">All</button>
+          <button class="btn-action active" id="btn-select-all" style="background:#334155; border-color:#475569; color:#fff;">All Leagues</button>
           <button class="btn-action" id="btn-big-4" style="background:#334155; border-color:#475569; color:#fff;">Big 4</button>
-          <button class="btn-action" id="btn-little-3" style="background:#334155; border-color:#475569; color:#fff;">Little 3</button>
         </div>
       </div>
       <div class="sidebar-content" id="sidebar-tree-wrap" style="gap: 8px;">
         <div class="conf-group" id="home-games-dropdown-group" style="flex-shrink:0;">
           <div class="games-dropdown-header" id="home-games-dropdown-toggle">
-            <span>Select Dates to View Home Games</span>
+            <span>View Home Games by Date</span>
             <span id="home-games-dropdown-arrow" style="font-size:9px; color:#64748b;">▼</span>
           </div>
           <div class="games-dropdown-body" id="home-games-dropdown-body" style="display:none;">
             <div style="display:flex; gap:4px; width:100%;">
               <button class="btn-action" id="btn-today" style="background:#334155; border-color:#475569; color:#fff;">Today</button>
+              <button class="btn-action" id="btn-next-3-days" style="background:#334155; border-color:#475569; color:#fff;">Next 3 Days</button>
+              <button class="btn-action" id="btn-reset-dates" style="background:#334155; border-color:#475569; color:#fff;">Reset</button>
             </div>
             <div style="display:flex; gap:4px; width:100%; align-items:center;">
               <input type="date" id="date-start" title="Start date" style="flex:1; min-width:0; background:#f8fafc; color:#0f172a; border:1px solid #cbd5e1; border-radius:4px; padding:3px 5px; font-size:10px; font-weight:600;">
@@ -442,18 +443,14 @@
     <div id="explorer-panel">
       <div class="nav-bar-banner">
         <div style="display: flex; gap: 4px; width: 100%;">
-          <button class="back-conf-btn" id="back-to-conf-btn">&larr; Back to Leagues</button>
+          <button class="back-conf-btn" id="back-to-conf-btn">USA View</button>
           <button class="back-conf-btn" id="prev-venue-btn">Previous</button>
           <button class="back-conf-btn" id="next-venue-btn">Next</button>
         </div>
       </div>
       <div class="panel-body" id="panel-content">
-        <div class="venue-photo-container">
-          <div class="photo-placeholder">Click any stadium marker on the map or team name in the sidebar to inspect details and Wikipedia photos.</div>
-        </div>
         <div>
-          <h2 class="team-title">Select a Team</h2>
-          <div class="team-subtitle">Interactive Dashboard</div>
+          <h2 class="team-title">Select a Team or Venue for Details</h2>
         </div>
       </div>
     </div>
@@ -724,7 +721,8 @@
     let currentVenueIndex = -1;
     let markersMap = {}; 
     let activeFilterKey = null; // Can be league name or "metro:MetroName"
-    let todayOnlyMode = false; // Keeps Today active while narrowing by league or metro
+    let todayOnlyMode = false; // Keeps selected date filter active while narrowing by league or metro
+    let activeDatePreset = null; // 'today' | 'next3' | 'custom' | null
 
     function getNationalZoom() {
       return window.innerWidth <= 1100 ? 3 : 4;
@@ -759,9 +757,55 @@
       return Number((entry.ymd || '99999999') + '0000');
     }
 
+    function buildTeamsAndVenuesFeedHtml() {
+      if (!activeFilterKey) return '';
+      const label = activeFilterKey.startsWith('metro:')
+        ? `${activeFilterKey.substring(6)} Teams & Venues`
+        : `${activeFilterKey} Teams & Venues`;
+
+      const sortedVenues = [...currentFilteredVenues].sort((a, b) => a.team.localeCompare(b.team));
+      if (!sortedVenues.length) {
+        return `
+          <div style="margin-top:2px;">
+            <div class="section-heading" style="margin-left:0;">${label}</div>
+            <div class="photo-placeholder" style="padding:8px 4px;">No teams found for this selection.</div>
+          </div>
+        `;
+      }
+
+      const itemsHtml = sortedVenues.map(v => {
+        const safeTeam = v.team.replace(/'/g, "\\'");
+        const color = LEAGUE_COLORS[v.league] || "#475569";
+        return `
+          <div class="game-feed-item" style="border-left-color:${color}; background:${color}10;">
+            <div style="display:flex; align-items:center; gap:5px;">
+              <span class="game-league-dot" style="background:${color};"></span>
+              <span class="game-feed-team" onclick="focusTeamFromScheduleFeed('${safeTeam}')">${v.team}</span>
+              <span style="font-size:9px; font-weight:700; color:#475569;"> (${v.league})</span>
+            </div>
+            <div style="font-weight:600; color:#1e293b; margin-top:1px;">${v.venue}</div>
+            <div class="game-feed-meta">${v.venueCity}</div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div style="margin-top:2px;">
+          <div class="section-heading" style="margin-left:0;">${label} (${sortedVenues.length})</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">${itemsHtml}</div>
+        </div>
+      `;
+    }
+
     function buildScheduledGamesFeedHtml() {
-      const showFeed = dateWindowActive || (activeFilterKey && activeFilterKey.startsWith('metro:'));
-      if (!showFeed) return '';
+      if (!dateWindowActive) {
+        if (activeFilterKey) return buildTeamsAndVenuesFeedHtml();
+        return `
+          <div>
+            <h2 class="team-title">Select a Team or Venue for Details</h2>
+          </div>
+        `;
+      }
 
       const entries = [];
       currentFilteredVenues.forEach(v => {
@@ -961,10 +1005,10 @@
             activeFilterKey = null;
           }
 
-          ['btn-select-all', 'btn-big-4', 'btn-little-3', 'btn-today'].forEach(id => {
+          ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
             const btn = document.getElementById(id);
             if (!btn) return;
-            if (id === 'btn-today' && todayOnlyMode) {
+            if ((id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3')) {
               btn.classList.add('active');
               btn.style.background = '#0284c7';
               btn.style.borderColor = '#0369a1';
@@ -1065,10 +1109,10 @@
             map.setView([39.8283, -98.5795], getNationalZoom());
           }
 
-          ['btn-select-all', 'btn-big-4', 'btn-little-3', 'btn-today'].forEach(id => {
+          ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
             const btn = document.getElementById(id);
             if (!btn) return;
-            if (id === 'btn-today' && todayOnlyMode) {
+            if ((id === 'btn-today' && activeDatePreset === 'today') || (id === 'btn-next-3-days' && activeDatePreset === 'next3')) {
               btn.classList.add('active');
               btn.style.background = '#0284c7';
               btn.style.borderColor = '#0369a1';
@@ -1117,9 +1161,7 @@
 
       const btnAll = document.getElementById('btn-select-all');
       const btnBig4 = document.getElementById('btn-big-4');
-      const btnLittle3 = document.getElementById('btn-little-3');
-      const btnToday = document.getElementById('btn-today');
-      const todayActive = todayOnlyMode || (btnToday && btnToday.classList.contains('active'));
+      const todayActive = todayOnlyMode || dateWindowActive;
 
       venues.forEach(v => {
         let show = false;
@@ -1135,8 +1177,6 @@
           show = Boolean(v.isPlayingInWindow);
         } else if (btnBig4 && btnBig4.classList.contains('active')) {
           show = BIG_4.has(v.league);
-        } else if (btnLittle3 && btnLittle3.classList.contains('active')) {
-          show = LITTLE_3.has(v.league);
         } else if (btnAll && btnAll.classList.contains('active')) {
           show = true;
         } else {
@@ -1148,7 +1188,7 @@
         }
       });
 
-      if (currentVenueIndex === -1 && (dateWindowActive || (activeFilterKey && activeFilterKey.startsWith('metro:')))) {
+      if (currentVenueIndex === -1) {
         resetRightPanel();
       }
 
@@ -1171,25 +1211,53 @@
       updateBasemapForZoom();
     }
 
-    function setActiveFilterButton(btnId) {
-      if (btnId === 'btn-select-all' || btnId === 'btn-big-4' || btnId === 'btn-little-3') {
-        todayOnlyMode = false;
-        dateWindowActive = false;
-      } else if (btnId === 'btn-today') {
-        todayOnlyMode = true;
-        dateWindowActive = true;
-      }
-      ['btn-select-all', 'btn-big-4', 'btn-little-3', 'btn-today'].forEach(id => {
+    function clearDateSelectionState() {
+      todayOnlyMode = false;
+      dateWindowActive = false;
+      activeDatePreset = null;
+      window._espnGamesByLeague = null;
+      document.getElementById('date-start').value = '';
+      document.getElementById('date-end').value = '';
+      ['btn-today', 'btn-next-3-days'].forEach(id => {
         const btn = document.getElementById(id);
         if (!btn) return;
         btn.classList.remove('active');
         btn.style.background = '#334155';
         btn.style.borderColor = '#475569';
       });
+    }
+
+    function setActiveFilterButton(btnId) {
+      if (btnId === 'btn-select-all' || btnId === 'btn-big-4') {
+        clearDateSelectionState();
+      } else if (btnId === 'btn-today') {
+        todayOnlyMode = true;
+        dateWindowActive = true;
+        activeDatePreset = 'today';
+      } else if (btnId === 'btn-next-3-days') {
+        todayOnlyMode = true;
+        dateWindowActive = true;
+        activeDatePreset = 'next3';
+      } else if (btnId === 'btn-apply-dates') {
+        todayOnlyMode = true;
+        dateWindowActive = true;
+        activeDatePreset = 'custom';
+      }
+
+      ['btn-select-all', 'btn-big-4', 'btn-today', 'btn-next-3-days'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.classList.remove('active');
+        btn.style.background = '#334155';
+        btn.style.borderColor = '#475569';
+      });
+
       const activeBtn = document.getElementById(btnId);
-      activeBtn.classList.add('active');
-      activeBtn.style.background = '#0284c7';
-      activeBtn.style.borderColor = '#0369a1';
+      if (activeBtn && btnId !== 'btn-apply-dates') {
+        activeBtn.classList.add('active');
+        activeBtn.style.background = '#0284c7';
+        activeBtn.style.borderColor = '#0369a1';
+      }
 
       activeFilterKey = null;
       document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
@@ -1269,14 +1337,12 @@
     /* Top Filter Buttons */
     document.getElementById('btn-select-all').addEventListener('click', () => {
       setActiveFilterButton('btn-select-all');
+      applyScheduleToVenues();
       updateMapFilters();
     });
     document.getElementById('btn-big-4').addEventListener('click', () => {
       setActiveFilterButton('btn-big-4');
-      updateMapFilters();
-    });
-    document.getElementById('btn-little-3').addEventListener('click', () => {
-      setActiveFilterButton('btn-little-3');
+      applyScheduleToVenues();
       updateMapFilters();
     });
     document.getElementById('btn-today').addEventListener('click', async () => {
@@ -1287,22 +1353,50 @@
       document.getElementById('active-count').textContent = "Checking today's games...";
       await fetchScoreboardsForRange(todayIso, todayIso, 'Today');
     });
+    document.getElementById('btn-next-3-days').addEventListener('click', async () => {
+      const startDt = new Date();
+      const endDt = new Date();
+      endDt.setDate(endDt.getDate() + 2);
+      const startIso = formatIsoLocalDate(startDt);
+      const endIso = formatIsoLocalDate(endDt);
+      document.getElementById('date-start').value = startIso;
+      document.getElementById('date-end').value = endIso;
+      setActiveFilterButton('btn-next-3-days');
+      document.getElementById('active-count').textContent = "Checking Next 3 Days...";
+      await fetchScoreboardsForRange(startIso, endIso, 'Next 3 Days');
+    });
+    document.getElementById('btn-reset-dates').addEventListener('click', () => {
+      clearDateSelectionState();
+      activeFilterKey = null;
+      document.querySelectorAll('.school-list').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.conf-toggle-arrow').forEach(el => el.textContent = '▼');
+      ['btn-select-all', 'btn-big-4'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.classList.remove('active');
+        btn.style.background = '#334155';
+        btn.style.borderColor = '#475569';
+      });
+      const allBtn = document.getElementById('btn-select-all');
+      allBtn.classList.add('active');
+      allBtn.style.background = '#0284c7';
+      allBtn.style.borderColor = '#0369a1';
+      applyScheduleToVenues();
+      updateMapFilters();
+      map.setView([39.8283, -98.5795], getNationalZoom());
+      resetRightPanel();
+    });
 
     document.getElementById('btn-apply-dates').addEventListener('click', async () => {
       const startVal = document.getElementById('date-start').value;
       const endVal = document.getElementById('date-end').value || startVal;
       if (!startVal) return;
       const label = startVal === endVal ? startVal : `${startVal} to ${endVal}`;
-      todayOnlyMode = true;
-      dateWindowActive = true;
-      setActiveFilterButton('btn-today');
+      setActiveFilterButton('btn-apply-dates');
       document.getElementById('active-count').textContent = `Checking ${label}...`;
       await fetchScoreboardsForRange(startVal, endVal, label);
     });
 
-    const initialTodayIso = formatIsoLocalDate(new Date());
-    document.getElementById('date-start').value = initialTodayIso;
-    fetchScoreboardsForRange(initialTodayIso, initialTodayIso, 'Today');
     fetchNextHomeGamesForAllVenues();
 
     /* Initialize initial active button state color */
