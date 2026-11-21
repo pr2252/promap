@@ -329,13 +329,13 @@
     .info-value { font-size: 11px; font-weight: 700; color: #0f172a; margin-top: 1px; }
 
     .notes-box {
-      background: #fef3c7;
-      border: 1px solid #fde68a;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 6px;
       padding: 6px 8px;
       font-size: 10px;
-      color: #92400e;
-      line-height: 1.3;
+      color: #334155;
+      line-height: 1.35;
     }
 
     .wiki-btn {
@@ -1100,7 +1100,7 @@
             <div class="info-value">${capacityStr}</div>
           </div>
         </div>
-        ${v.nextHomeGame ? `<div class="notes-box" style="background:#f0fdf4; border-color:#bbf7d0; color:#14532d;"><b>Next Home Game:</b> ${v.nextHomeGame}</div>` : ''}
+        ${v.nextHomeGame ? `<div class="notes-box" style="background:${color}14; border-color:${color}66; border-left:4px solid ${color}; color:#0f172a;"><b>Next Home Game:</b> ${v.nextHomeGame}</div>` : ''}
         ${uniqueWindowGames.length ? `<div class="notes-box" style="background:#e0f2fe; border-color:#bae6fd; color:#0c4a6e;"><b>${activeDateRangeLabel === 'Today' ? "Today's Game" : 'Selected Dates'}:</b><br>${uniqueWindowGames.join('<br>')}</div>` : ''}
         ${v.notes ? `<div class="notes-box"><b>Notes:</b> ${v.notes}</div>` : ''}
       `;
